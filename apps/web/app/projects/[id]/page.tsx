@@ -59,8 +59,19 @@ export default function ProjectDetailPage() {
   return (
     <div className="p-8">
       <Link href="/projects" className="text-blue-600 hover:underline mb-4 block">← Back to Projects</Link>
-      <h1 className="text-3xl font-bold mb-2">{project.name}</h1>
-      <p className="text-gray-500 mb-8">{project.repo_url} (branch: {project.default_branch})</p>
+      <div className="flex justify-between items-start mb-8">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">{project.name}</h1>
+          <p className="text-gray-500">{project.repo_url} (branch: {project.default_branch})</p>
+        </div>
+        <Link
+          href={`/projects/${id}/workflow`}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-purple-700 transition flex items-center gap-2"
+        >
+          <span>Visual Workflow Builder</span>
+          <span className="bg-purple-500 px-2 py-0.5 rounded text-[10px] uppercase">n8n Style</span>
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-4">

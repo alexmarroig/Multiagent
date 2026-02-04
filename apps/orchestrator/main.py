@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 import os, requests
 from .db import get_db
-from .models import Run, Task
+from .models import Run, Task, Project
 from .langgraph_planner import generate_plan
 from pydantic import BaseModel
 
@@ -20,7 +20,25 @@ async def create_run(run_data: RunCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(run)
 
-    plan_md, tasks_data, chat_log = generate_plan(run_data.objective)
+    # Check for custom visual workflow
+    from sqlalchemy import text
+    workflow_query = text("SELECT nodes FROM workflows WHERE project_id = :pid")
+    result = db.execute(workflow_query, {"pid": run_data.project_id}).fetchone()
+
+    if result and result[0]:
+        nodes = result[0]
+        tasks_data = []
+        for i, node in enumerate(nodes):
+            tasks_data.append({
+                "title": node["data"]["label"],
+                "description": f"Executing node from visual workflow: {node['data']['label']}",
+                "order_index": i
+            })
+        plan_md = "# Visual Workflow Execution\nExecuting based on n8n-style custom diagram."
+        chat_log = ["System: Custom visual workflow detected.", "CTO: Loading tasks from diagram nodes."]
+    else:
+        plan_md, tasks_data, chat_log = generate_plan(run_data.objective)
+
     run.plan = plan_md
     run.chat_history = chat_log
     run.status = "pending"
