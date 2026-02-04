@@ -1,0 +1,12 @@
+{
+  "name": "agentic-dev-studio",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:orchestrator": "cd apps/orchestrator && ./run.sh",
+    "dev:executor": "cd apps/executor && ./run.sh"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
