@@ -1,7 +1,7 @@
 export type Connection = { id: string; user_id: string; type: 'github'; token: string; created_at: string; };
 export type Project = { id: string; user_id: string; name: string; repo_url: string; default_branch: string; created_at: string; };
 export type RunStatus = 'pending' | 'planning' | 'running' | 'completed' | 'failed';
-export type Run = { id: string; project_id: string; objective: string; plan: string | null; status: RunStatus; created_at: string; };
+export type Run = { id: string; project_id: string; objective: string; plan: string | null; chat_history: string[]; status: RunStatus; created_at: string; };
 export type TaskStatus = 'todo' | 'running' | 'completed' | 'failed';
 export type Task = { id: string; run_id: string; title: string; description: string | null; status: TaskStatus; order_index: number; patch: string | null; created_at: string; };
 export type ArtifactType = 'diff' | 'xlsx' | 'file';

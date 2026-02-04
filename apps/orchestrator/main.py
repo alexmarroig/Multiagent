@@ -20,8 +20,9 @@ async def create_run(run_data: RunCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(run)
 
-    plan_md, tasks_data = generate_plan(run_data.objective)
+    plan_md, tasks_data, chat_log = generate_plan(run_data.objective)
     run.plan = plan_md
+    run.chat_history = chat_log
     run.status = "pending"
     db.commit()
 

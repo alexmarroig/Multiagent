@@ -82,6 +82,19 @@ export default function RunDetailPage() {
           <Link href={`/projects/${run.project_id}`} className="text-sm text-blue-600 hover:underline mb-2 block">← Back to Project</Link>
           <h1 className="font-bold text-lg line-clamp-2">{run.objective}</h1>
         </div>
+
+        {/* Agent Chat Section */}
+        <div className="p-4 border-b bg-blue-50/50">
+          <h2 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Agent Discussion</h2>
+          <div className="space-y-2 max-h-48 overflow-auto text-[11px] leading-tight">
+            {run.chat_history?.map((msg, idx) => (
+              <div key={idx} className="bg-white p-2 rounded shadow-sm border border-blue-100">
+                {msg}
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex-1 overflow-auto p-4 space-y-2">
           <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Tasks</h2>
           {tasks.map((task) => (

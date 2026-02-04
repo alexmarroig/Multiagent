@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, BigInteger
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Text, BigInteger, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
@@ -27,6 +27,7 @@ class Run(Base):
     project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
     objective = Column(Text, nullable=False)
     plan = Column(Text)
+    chat_history = Column(JSON, default=[])
     status = Column(String, default="pending")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

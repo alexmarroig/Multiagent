@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS runs (
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     objective TEXT NOT NULL,
     plan TEXT,
+    chat_history JSONB DEFAULT '[]'::jsonb,
     status TEXT NOT NULL DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
