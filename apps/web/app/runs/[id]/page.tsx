@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { Run, Task, TaskLog, Artifact } from '@ads/shared';
+import VisualCanvas from '@/components/VisualCanvas';
 
 export default function RunDetailPage() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function RunDetailPage() {
   const [logs, setLogs] = useState<TaskLog[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [executing, setExecuting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'logs' | 'visual'>('logs');
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -139,6 +141,28 @@ export default function RunDetailPage() {
             </div>
 
             <div className="flex-1 overflow-auto p-6 space-y-6">
+              {/* Tabs */}
+              <div className="flex space-x-4 border-b mb-4">
+                <button
+                  onClick={() => setActiveTab('logs')}
+                  className={`pb-2 px-1 text-sm font-bold ${activeTab === 'logs' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                >
+                  Logs & Diff
+                </button>
+                <button
+                  onClick={() => setActiveTab('visual')}
+                  className={`pb-2 px-1 text-sm font-bold ${activeTab === 'visual' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500'}`}
+                >
+                  Visual Flow
+                </button>
+              </div>
+
+              {activeTab === 'visual' ? (
+                <div className="h-[600px]">
+                  <VisualCanvas tasks={tasks} />
+                </div>
+              ) : (
+                <>
               <div className="bg-gray-900 rounded-lg p-4 font-mono text-sm text-green-400 min-h-[300px] shadow-inner">
                 <div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2 text-gray-500 uppercase text-xs">
                   <span>Execution Logs</span>
@@ -180,6 +204,8 @@ export default function RunDetailPage() {
                     ))}
                   </div>
                 </div>
+              )}
+              </>
               )}
             </div>
           </>
