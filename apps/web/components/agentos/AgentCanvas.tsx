@@ -15,6 +15,7 @@ type AgentCanvasProps = {
 };
 
 export default function AgentCanvas({ onRun, isRunning }: AgentCanvasProps) {
+export default function AgentCanvas() {
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const onNodesChange = useCanvasStore((s) => s.onNodesChange);
@@ -35,6 +36,7 @@ export default function AgentCanvas({ onRun, isRunning }: AgentCanvasProps) {
         </button>
       </div>
 
+    <main className="h-full w-full bg-slate-100">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -54,6 +56,9 @@ export default function AgentCanvas({ onRun, isRunning }: AgentCanvasProps) {
         />
         <Controls className="!shadow-md" />
         <Background gap={20} size={1} className="!bg-slate-100 dark:!bg-slate-950" />
+        <MiniMap zoomable pannable />
+        <Controls />
+        <Background gap={20} size={1} />
       </ReactFlow>
     </main>
   );
