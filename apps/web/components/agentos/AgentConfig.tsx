@@ -3,6 +3,9 @@
 import { useMemo } from 'react';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 
+const inputClassName =
+  'mt-1 w-full rounded border border-slate-300 bg-white p-2 text-sm text-slate-900 outline-none ring-0 focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100';
+
 export default function AgentConfig() {
   const nodes = useCanvasStore((s) => s.nodes);
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
@@ -15,6 +18,9 @@ export default function AgentConfig() {
 
   if (!selectedNode) {
     return (
+      <aside className="h-full w-80 border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Configuração</h2>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
       <aside className="h-full w-80 border-l bg-white p-4">
         <h2 className="text-lg font-bold">Configuração</h2>
         <p className="mt-2 text-sm text-slate-500">
@@ -25,6 +31,15 @@ export default function AgentConfig() {
   }
 
   return (
+    <aside className="h-full w-80 border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <h2 className="mb-1 text-lg font-bold text-slate-900 dark:text-slate-100">Configuração do Agente</h2>
+      <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">ID: {selectedNode.id}</p>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          Nome
+          <input
+            className={inputClassName}
     <aside className="h-full w-80 border-l bg-white p-4">
       <h2 className="mb-4 text-lg font-bold">Configuração do Agente</h2>
 
@@ -38,6 +53,10 @@ export default function AgentConfig() {
           />
         </label>
 
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          Modelo
+          <input
+            className={inputClassName}
         <label className="block text-sm font-medium">
           Modelo
           <input
@@ -47,6 +66,10 @@ export default function AgentConfig() {
           />
         </label>
 
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          Prompt
+          <textarea
+            className={`${inputClassName} h-32`}
         <label className="block text-sm font-medium">
           Prompt
           <textarea
@@ -56,6 +79,10 @@ export default function AgentConfig() {
           />
         </label>
 
+        <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          Ferramentas (CSV)
+          <input
+            className={inputClassName}
         <label className="block text-sm font-medium">
           Ferramentas (CSV)
           <input
