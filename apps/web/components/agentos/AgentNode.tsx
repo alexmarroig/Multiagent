@@ -14,17 +14,20 @@ function AgentNode({ selected, data }: Props) {
 
   return (
     <div
-      className="min-w-[240px] max-w-[280px] overflow-hidden rounded-xl border bg-white shadow-md dark:bg-slate-900"
+      className="min-w-[240px] max-w-[280px] rounded-xl border bg-white shadow-md"
       style={{
         borderColor,
         borderWidth: selected ? 3 : 2,
       }}
     >
       <Handle type="target" position={Position.Left} />
-      <div className="px-3 py-2 text-white" style={{ backgroundColor: borderColor }}>
+      <div
+        className="rounded-t-xl px-3 py-2 text-white"
+        style={{ backgroundColor: borderColor }}
+      >
         <p className="text-sm font-semibold">{data.label}</p>
       </div>
-      <div className="space-y-2 p-3 text-xs text-slate-700 dark:text-slate-200">
+      <div className="space-y-2 p-3 text-xs text-slate-700">
         <p>{data.description}</p>
         <p>
           <span className="font-semibold">Modelo:</span> {data.model}

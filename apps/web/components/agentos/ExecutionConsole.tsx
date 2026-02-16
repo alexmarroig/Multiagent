@@ -14,7 +14,7 @@ export default function ExecutionConsole() {
   };
 
   return (
-    <section className="h-56 border-t border-slate-700 bg-slate-950 p-3 font-mono text-xs text-green-300">
+    <section className="h-56 border-t bg-slate-950 p-3 font-mono text-xs text-green-300">
       <div className="mb-2 flex items-center justify-between border-b border-slate-700 pb-2">
         <p className="font-semibold uppercase text-slate-300">Execution Console</p>
         <div className="space-x-2">

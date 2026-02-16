@@ -18,7 +18,7 @@ export default function AgentCanvas() {
   const selectNode = useCanvasStore((s) => s.selectNode);
 
   return (
-    <main className="h-full w-full bg-slate-100 dark:bg-slate-950">
+    <main className="h-full w-full bg-slate-100">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -30,14 +30,9 @@ export default function AgentCanvas() {
         onNodeClick={(_, node) => selectNode(node.id)}
         onPaneClick={() => selectNode(null)}
       >
-        <MiniMap
-          zoomable
-          pannable
-          style={{ background: 'transparent' }}
-          maskColor="rgba(15, 23, 42, 0.15)"
-        />
-        <Controls className="!shadow-md" />
-        <Background gap={20} size={1} className="!bg-slate-100 dark:!bg-slate-950" />
+        <MiniMap zoomable pannable />
+        <Controls />
+        <Background gap={20} size={1} />
       </ReactFlow>
     </main>
   );
