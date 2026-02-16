@@ -1,0 +1,44 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.example
+    volumes:
+      - ./credentials:/app/credentials
+      - ./outputs:/app/outputs
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - chromadb
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /workspace
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    command: sh -c "echo 'Frontend container placeholder para integração AgentOS' && sleep infinity"
+    ports:
+      - "3000:3000"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.example
+    command: celery -A main.celery_app worker -Q agents --loglevel=info
+    depends_on:
+      - redis
