@@ -48,7 +48,6 @@ export async function runFlow(payload: FlowPayload): Promise<RunResult> {
   const response = await fetch(`${BASE}/api/agents/run`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 
@@ -79,7 +78,6 @@ export async function downloadExcel(config: {
   const response = await fetch(`${BASE}/api/tools/excel/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
   });
 
@@ -95,8 +93,6 @@ export async function downloadExcel(config: {
   link.click();
   URL.revokeObjectURL(url);
 }
-
-
 
 export async function downloadArtifactExcel(config: { artifact_id?: string; artifact_path?: string }) {
   const params = new URLSearchParams();
@@ -115,12 +111,13 @@ export async function downloadArtifactExcel(config: { artifact_id?: string; arti
 
   const filenameFromHeader = response.headers
     .get('content-disposition')
-    ?.match(/filename=\"?([^\";]+)\"?/)?.[1];
+    ?.match(/filename="?([^";]+)"?/)?.[1];
 
   link.download = filenameFromHeader ?? config.artifact_id ?? 'relatorio.xlsx';
   link.click();
   URL.revokeObjectURL(url);
 }
+
 export async function scheduleMeeting(config: {
   title: string;
   start_datetime: string;
@@ -131,7 +128,6 @@ export async function scheduleMeeting(config: {
   const response = await fetch(`${BASE}/api/tools/calendar/schedule`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
   });
   return response.json();
@@ -145,7 +141,6 @@ export async function makeCall(config: {
   const response = await fetch(`${BASE}/api/tools/phone/call`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
   });
   return response.json();

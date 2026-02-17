@@ -18,6 +18,7 @@ import {
   type NodeStatus,
   type RunState,
 } from '@/types/agentos';
+import { supabase } from '@/lib/supabase/client';
 
 type CanvasStore = {
   nodes: Node<AgentNodeData>[];
@@ -43,34 +44,14 @@ type CanvasStore = {
   setLastResult: (result: string) => void;
   setBackendOnline: (value: boolean) => void;
   resetRun: () => void;
+  saveFlow: (name: string, description?: string) => Promise<unknown>;
+  loadFlow: (flowId: string) => Promise<void>;
 };
 
-export const useCanvasStore = create<CanvasStore>((set) => ({
+export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
-};
-
-const defaultNodes: Node<AgentNodeData>[] = [
-  {
-    id: 'node-supervisor',
-    type: 'agentNode',
-    position: { x: 450, y: 220 },
-    data: {
-      label: 'SupervisorAgent',
-      category: 'supervisor',
-      description: 'Coordena a execução dos agentes do fluxo.',
-      model: 'gpt-4.1',
-      prompt: AGENT_TEMPLATES.find((t) => t.id === 'supervisor-agent')?.defaultPrompt ?? '',
-      tools: ['langgraph', 'evaluation'],
-    },
-  },
-];
-
-export const useCanvasStore = create<CanvasStore>((set) => ({
-  nodes: defaultNodes,
-  edges: [],
-  selectedNodeId: defaultNodes[0].id,
   executionLogs: [
     '[boot] AgentOS canvas inicializado.',
     '[hint] Arraste agentes da sidebar para o canvas.',
@@ -178,6 +159,55 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
       nodeStatuses: {},
       lastResult: null,
     })),
+
+  saveFlow: async (name, description = '') => {
+    const { nodes, edges } = get();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const config = {
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        position: n.position,
+        data: n.data,
+      })),
+      edges: edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+      })),
+    };
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/flows`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+      body: JSON.stringify({ name, description, config }),
+    });
+
+    return response.json();
+  },
+
+  loadFlow: async (flowId) => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/flows/${flowId}`, {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    });
+
+    const flow = await response.json();
+
+    set({
+      nodes: flow.config?.nodes ?? [],
+      edges: flow.config?.edges ?? [],
+    });
+  },
 }));
 
 // Utilitário para mapear automaticamente templates por nome.
@@ -187,4 +217,3 @@ export function findTemplateByAgentName(agentName: string): AgentTemplate | unde
     normalized.includes(template.name.toLowerCase().replace('agent', '')),
   );
 }
-}));
