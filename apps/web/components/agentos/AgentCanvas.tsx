@@ -10,17 +10,11 @@ import TemplateGallery from '@/components/agentos/TemplateGallery';
 import { useAgentStream } from '@/hooks/useAgentStream';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 import type { NodeStatus } from '@/types/agentos';
+import ReactFlow, { Background, Controls, MiniMap } from 'reactflow';
+import AgentNode from '@/components/agentos/AgentNode';
+import { useCanvasStore } from '@/hooks/useCanvasStore';
 
-const nodeTypes = {
-  agentNode: AgentNode,
-};
-
-function mapEventToStatus(eventType: string): NodeStatus | null {
-  if (eventType === 'thinking' || eventType === 'action' || eventType === 'tool_call') return 'running';
-  if (eventType === 'result') return 'done';
-  if (eventType === 'error') return 'error';
-  return null;
-}
+const nodeTypes = { agentNode: AgentNode };
 
 export default function AgentCanvas() {
   const [showRunModal, setShowRunModal] = useState(false);
@@ -157,6 +151,24 @@ export default function AgentCanvas() {
           />
         </div>
       )}
+
+  return (
+    <main className="h-full w-full bg-slate-100 dark:bg-slate-950">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={(_, node) => selectNode(node.id)}
+        onPaneClick={() => selectNode(null)}
+      >
+        <MiniMap zoomable pannable />
+        <Controls />
+        <Background gap={20} size={1} />
+      </ReactFlow>
     </main>
   );
 }

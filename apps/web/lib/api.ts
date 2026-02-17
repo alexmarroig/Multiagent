@@ -35,15 +35,6 @@ export interface RunResult {
   ws_url: string;
 }
 
-export interface Template {
-  id: string;
-  name: string;
-  description: string;
-  agents: string[];
-  color: string;
-  inputs: string[];
-}
-
 export async function runFlow(payload: FlowPayload): Promise<RunResult> {
   const response = await fetch(`${BASE}/api/agents/run`, {
     method: 'POST',
