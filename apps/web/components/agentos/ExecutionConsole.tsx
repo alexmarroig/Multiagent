@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { downloadExcel } from '@/lib/api';
+import { downloadArtifactExcel, downloadExcel } from '@/lib/api';
 import type { AgentEvent, EventType } from '@/hooks/useAgentStream';
 
 type ExecutionConsoleProps = {
@@ -9,6 +9,11 @@ type ExecutionConsoleProps = {
   isConnected: boolean;
   isDone: boolean;
   error: string | null;
+};
+
+type ArtifactPayload = {
+  artifact_id?: string;
+  artifact_path?: string;
 };
 
 const EVENT_STYLE: Record<EventType, { icon: string; badge: string; bg: string }> = {
@@ -27,6 +32,22 @@ function relativeTime(isoDate: string): string {
   return `há ${minutes}min`;
 }
 
+function parseArtifactEvent(event: AgentEvent): ArtifactPayload | null {
+  if (event.event_type !== 'result') return null;
+  const content = typeof event.content === 'string' ? event.content : '';
+  if (!content) return null;
+
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const artifactId = typeof parsed.artifact_id === 'string' ? parsed.artifact_id : undefined;
+    const artifactPath = typeof parsed.artifact_path === 'string' ? parsed.artifact_path : undefined;
+    const hasXlsx = (artifactId ?? artifactPath ?? '').toLowerCase().endsWith('.xlsx');
+    return hasXlsx ? { artifact_id: artifactId, artifact_path: artifactPath } : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ExecutionConsole({ events, isConnected, isDone, error }: ExecutionConsoleProps) {
   const [hiddenUntil, setHiddenUntil] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -41,7 +62,17 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
     [events, hiddenUntil],
   );
 
-  const excelMentioned = visibleEvents.some((event) => event.content.includes('.xlsx'));
+  const latestExcelArtifact = useMemo(() => {
+    for (let idx = visibleEvents.length - 1; idx >= 0; idx -= 1) {
+      const artifact = parseArtifactEvent(visibleEvents[idx]);
+      if (artifact) return artifact;
+    }
+    return null;
+  }, [visibleEvents]);
+
+  const excelMentioned = Boolean(
+    latestExcelArtifact || visibleEvents.some((event) => String(event.content).toLowerCase().includes('.xlsx')),
+  );
 
   const copyAll = async () => {
     const text = visibleEvents
@@ -51,6 +82,11 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
   };
 
   const downloadExcelFromResult = async () => {
+    if (latestExcelArtifact) {
+      await downloadArtifactExcel(latestExcelArtifact);
+      return;
+    }
+
     await downloadExcel({
       title: 'Resultado AgentOS',
       data: visibleEvents.map((event) => ({
@@ -103,65 +139,11 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
                 <span className="text-[10px] text-slate-400">{relativeTime(event.timestamp)}</span>
               </div>
               <p className={`whitespace-pre-wrap text-xs ${event.event_type === 'result' ? 'font-semibold text-emerald-200' : 'text-slate-200'}`}>
-                {event.content}
+                {String(event.content)}
               </p>
             </article>
           );
         })}
-import { useCanvasStore } from '@/hooks/useCanvasStore';
-
-type ExecutionConsoleProps = {
-  isConnected?: boolean;
-};
-
-export default function ExecutionConsole({ isConnected = false }: ExecutionConsoleProps) {
-  const executionLogs = useCanvasStore((s) => s.executionLogs);
-  const clearLogs = useCanvasStore((s) => s.clearLogs);
-
-  return (
-    <section className="h-56 border-t border-slate-700 bg-slate-950 p-3 font-mono text-xs text-green-300">
-      <div className="mb-2 flex items-center justify-between border-b border-slate-700 pb-2">
-        <p className="font-semibold uppercase text-slate-300">Execution Console</p>
-        <div className="flex items-center gap-3">
-          <span className={`text-[10px] ${isConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {isConnected ? 'WS conectado' : 'WS desconectado'}
-          </span>
-export default function ExecutionConsole() {
-  const executionLogs = useCanvasStore((s) => s.executionLogs);
-  const appendLog = useCanvasStore((s) => s.appendLog);
-  const clearLogs = useCanvasStore((s) => s.clearLogs);
-
-  const handleMockRun = () => {
-    appendLog(`[run] Fluxo disparado em ${new Date().toLocaleTimeString('pt-BR')}.`);
-    appendLog('[supervisor] Delegando tarefas para agentes conectados...');
-    appendLog('[status] Módulo 1 concluído: fluxo visual pronto para integração backend.');
-  };
-
-  return (
-    <section className="h-56 border-t bg-slate-950 p-3 font-mono text-xs text-green-300">
-      <div className="mb-2 flex items-center justify-between border-b border-slate-700 pb-2">
-        <p className="font-semibold uppercase text-slate-300">Execution Console</p>
-        <div className="space-x-2">
-          <button
-            type="button"
-            onClick={handleMockRun}
-            className="rounded bg-emerald-600 px-2 py-1 text-white hover:bg-emerald-500"
-          >
-            Run Mock
-          </button>
-          <button
-            type="button"
-            onClick={clearLogs}
-            className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600"
-          >
-            Limpar
-          </button>
-        </div>
-      </div>
-      <div className="h-44 overflow-auto pr-2">
-        {executionLogs.map((line, idx) => (
-          <p key={`${line}-${idx}`}>{line}</p>
-        ))}
       </div>
     </section>
   );
