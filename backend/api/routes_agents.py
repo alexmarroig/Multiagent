@@ -9,7 +9,6 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks
 
 from models.schemas import FlowConfig
-from orchestrator.crew_builder import build_crew_from_config
 from orchestrator.event_stream import make_event, publish_event
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -22,6 +21,8 @@ async def execute_flow(flow: FlowConfig) -> None:
         make_event(flow.session_id, "system", "AgentOS", "thinking", "Iniciando execução do fluxo"),
     )
     try:
+        from orchestrator.crew_builder import build_crew_from_config
+
         crew = build_crew_from_config(flow)
         result = await asyncio.to_thread(crew.kickoff, inputs=flow.inputs)
         await publish_event(
@@ -60,7 +61,7 @@ async def list_templates() -> list[dict]:
             "id": "travel_agency",
             "name": "Agência de Turismo",
             "description": "Pesquisa, reserva e consolidação de custos.",
-            "agents": ["research", "travel", "financial", "meeting"],
+            "agents": ["travel", "financial", "meeting", "supervisor"],
             "color": "orange",
             "inputs": ["destination", "budget_brl", "days"],
         },
@@ -68,7 +69,7 @@ async def list_templates() -> list[dict]:
             "id": "marketing_company",
             "name": "Empresa de Marketing",
             "description": "Pesquisa de mercado e execução de campanhas.",
-            "agents": ["research", "marketing", "content", "email"],
+            "agents": ["marketing", "financial", "excel", "supervisor"],
             "color": "blue",
             "inputs": ["segment", "product", "goal"],
         },
@@ -76,7 +77,7 @@ async def list_templates() -> list[dict]:
             "id": "financial_office",
             "name": "Escritório Financeiro",
             "description": "Análise financeira e geração de relatório executivo.",
-            "agents": ["data", "financial", "excel", "report"],
+            "agents": ["financial", "excel", "meeting", "supervisor"],
             "color": "green",
             "inputs": ["ticker", "period"],
         },
@@ -84,7 +85,7 @@ async def list_templates() -> list[dict]:
             "id": "executive_assistant",
             "name": "Assistente Executivo",
             "description": "Organização de agenda com comunicações automáticas.",
-            "agents": ["email", "meeting", "phone", "calendar"],
+            "agents": ["meeting", "phone", "travel", "supervisor"],
             "color": "purple",
             "inputs": ["attendees", "meeting_topic", "timeslots"],
         },
