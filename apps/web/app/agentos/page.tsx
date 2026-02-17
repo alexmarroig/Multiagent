@@ -1,5 +1,25 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import AgentCanvas from '@/components/agentos/AgentCanvas';
+import AgentConfig from '@/components/agentos/AgentConfig';
+import AgentSidebar from '@/components/agentos/AgentSidebar';
+import TemplateGallery from '@/components/agentos/TemplateGallery';
+import { healthCheck } from '@/lib/api';
+import { useCanvasStore } from '@/hooks/useCanvasStore';
+
+/**
+ * Página do Módulo 3: conexão real com backend + templates + execução completa.
+ */
+export default function AgentOSPage() {
+  const [darkMode, setDarkMode] = useState(true);
+  const [showTemplateTab, setShowTemplateTab] = useState(false);
+  const backendOnline = useCanvasStore((s) => s.backendOnline);
+  const setBackendOnline = useCanvasStore((s) => s.setBackendOnline);
+
+  useEffect(() => {
+    healthCheck().then((isOnline) => setBackendOnline(isOnline));
+  }, [setBackendOnline]);
 import { useEffect, useMemo, useState } from 'react';
 import { useState } from 'react';
 import AgentCanvas from '@/components/agentos/AgentCanvas';
@@ -103,11 +123,19 @@ export default function AgentOSPage() {
           <div>
             <h1 className="text-lg font-bold">AgentOS Canvas</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
+              Módulo 3 • Fluxo real com templates e execução em tempo real
               Módulo 2 • Canvas conectado ao backend com stream em tempo real
               Módulo 1 • Biblioteca por categoria + canvas + painel de configuração
             </p>
           </div>
           <div className="space-x-2">
+            <button
+              type="button"
+              onClick={() => setShowTemplateTab((prev) => !prev)}
+              className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white"
+            >
+              Templates
+            </button>
             <button
               type="button"
               onClick={() => setDarkMode((prev) => !prev)}
@@ -118,6 +146,21 @@ export default function AgentOSPage() {
             <button className="rounded bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white dark:bg-slate-700">
               Save
             </button>
+          </div>
+        </header>
+
+        {!backendOnline && (
+          <div className="border-b border-amber-500/30 bg-amber-500/20 px-4 py-2 text-sm text-amber-200">
+            Backend offline — inicie com docker-compose up
+          </div>
+        )}
+
+        {showTemplateTab && (
+          <div className="border-b border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+            <TemplateGallery onTemplateApplied={() => setShowTemplateTab(false)} />
+          </div>
+        )}
+
             <button className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">
               Run
             </button>
@@ -128,6 +171,11 @@ export default function AgentOSPage() {
           <AgentSidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="min-h-0 flex-1">
+              <AgentCanvas />
+            </div>
+          </div>
+          <AgentConfig />
+        </div>
               <AgentCanvas onRun={handleRun} isRunning={isRunning} />
             </div>
             <ExecutionConsole isConnected={isConnected} />

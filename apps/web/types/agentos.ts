@@ -7,6 +7,10 @@ export type AgentCategory =
   | 'supervisor'
   | 'utility';
 
+export type NodeStatus = 'idle' | 'running' | 'done' | 'error';
+
+export type RunState = 'idle' | 'running' | 'done' | 'error';
+
 export type AgentNodeData = {
   label: string;
   category: AgentCategory;
@@ -14,6 +18,7 @@ export type AgentNodeData = {
   model: string;
   prompt: string;
   tools: string[];
+  status?: NodeStatus;
 };
 
 export type AgentTemplate = {

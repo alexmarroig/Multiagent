@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { AGENT_COLOR, type AgentNodeData } from '@/types/agentos';
+import { NodeStatusBadge } from '@/components/agentos/NodeStatusBadge';
 
 type Props = NodeProps<AgentNodeData>;
 
@@ -14,6 +15,7 @@ function AgentNode({ selected, data }: Props) {
 
   return (
     <div
+      className="relative min-w-[240px] max-w-[280px] overflow-hidden rounded-xl border bg-white shadow-md dark:bg-slate-900"
       className="min-w-[240px] max-w-[280px] overflow-hidden rounded-xl border bg-white shadow-md dark:bg-slate-900"
       className="min-w-[240px] max-w-[280px] rounded-xl border bg-white shadow-md"
       style={{
@@ -22,6 +24,11 @@ function AgentNode({ selected, data }: Props) {
       }}
     >
       <Handle type="target" position={Position.Left} />
+
+      <div className="absolute right-1 top-1 z-10">
+        <NodeStatusBadge status={data.status ?? 'idle'} />
+      </div>
+
       <div className="px-3 py-2 text-white" style={{ backgroundColor: borderColor }}>
         <p className="text-sm font-semibold">{data.label}</p>
       </div>

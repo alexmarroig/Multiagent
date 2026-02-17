@@ -15,6 +15,8 @@ import {
   AGENT_TEMPLATES,
   type AgentNodeData,
   type AgentTemplate,
+  type NodeStatus,
+  type RunState,
 } from '@/types/agentos';
 
 type CanvasStore = {
@@ -22,6 +24,11 @@ type CanvasStore = {
   edges: Edge[];
   selectedNodeId: string | null;
   executionLogs: string[];
+  sessionId: string | null;
+  runState: RunState;
+  nodeStatuses: Record<string, NodeStatus>;
+  lastResult: string | null;
+  backendOnline: boolean;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -30,6 +37,18 @@ type CanvasStore = {
   updateNodeData: (id: string, data: Partial<AgentNodeData>) => void;
   appendLog: (line: string) => void;
   clearLogs: () => void;
+  setSessionId: (id: string | null) => void;
+  setRunState: (state: RunState) => void;
+  setNodeStatus: (nodeId: string, status: NodeStatus) => void;
+  setLastResult: (result: string) => void;
+  setBackendOnline: (value: boolean) => void;
+  resetRun: () => void;
+};
+
+export const useCanvasStore = create<CanvasStore>((set) => ({
+  nodes: [],
+  edges: [],
+  selectedNodeId: null,
 };
 
 const defaultNodes: Node<AgentNodeData>[] = [
@@ -56,6 +75,11 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
     '[boot] AgentOS canvas inicializado.',
     '[hint] Arraste agentes da sidebar para o canvas.',
   ],
+  sessionId: null,
+  runState: 'idle',
+  nodeStatuses: {},
+  lastResult: null,
+  backendOnline: false,
 
   onNodesChange: (changes) =>
     set((state) => ({ nodes: applyNodeChanges(changes, state.nodes) })),
@@ -94,6 +118,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
           model: 'gpt-4.1-mini',
           prompt: template.defaultPrompt,
           tools: template.defaultTools,
+          status: 'idle',
         },
       };
 
@@ -129,4 +154,37 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
 
   clearLogs: () =>
     set(() => ({ executionLogs: ['[console] Logs limpos pelo usuário.'] })),
+
+  setSessionId: (id) => set(() => ({ sessionId: id })),
+
+  setRunState: (state) => set(() => ({ runState: state })),
+
+  setNodeStatus: (nodeId, status) =>
+    set((state) => ({
+      nodeStatuses: {
+        ...state.nodeStatuses,
+        [nodeId]: status,
+      },
+    })),
+
+  setLastResult: (result) => set(() => ({ lastResult: result })),
+
+  setBackendOnline: (value) => set(() => ({ backendOnline: value })),
+
+  resetRun: () =>
+    set(() => ({
+      sessionId: null,
+      runState: 'idle',
+      nodeStatuses: {},
+      lastResult: null,
+    })),
+}));
+
+// Utilitário para mapear automaticamente templates por nome.
+export function findTemplateByAgentName(agentName: string): AgentTemplate | undefined {
+  const normalized = agentName.toLowerCase();
+  return AGENT_TEMPLATES.find((template) =>
+    normalized.includes(template.name.toLowerCase().replace('agent', '')),
+  );
+}
 }));
