@@ -36,8 +36,7 @@ Run each of these in a separate terminal:
 
 **Web App:**
 ```bash
-cd apps/web
-pnpm dev
+pnpm dev:web
 ```
 
 **Orchestrator:**
@@ -51,6 +50,21 @@ cd apps/orchestrator
 cd apps/executor
 ./run.sh
 ```
+
+### 5. Backend via Docker Compose
+The backend Docker Compose file lives at:
+
+```bash
+backend/docker-compose.yml
+```
+
+Run it from the repository root:
+
+```bash
+docker compose -f backend/docker-compose.yml up --build
+```
+
+> Note: In this compose file, the `frontend` service is only a placeholder container for integration tests and **does not** serve the real web application from `apps/web`. To run the web app, use `pnpm dev:web`.
 
 ## Quick Demo Flow
 1. **Login**: Go to `http://localhost:3000/login` and sign up/in.
