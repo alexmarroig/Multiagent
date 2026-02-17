@@ -49,6 +49,28 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   nodes: [],
   edges: [],
   selectedNodeId: null,
+};
+
+const defaultNodes: Node<AgentNodeData>[] = [
+  {
+    id: 'node-supervisor',
+    type: 'agentNode',
+    position: { x: 450, y: 220 },
+    data: {
+      label: 'SupervisorAgent',
+      category: 'supervisor',
+      description: 'Coordena a execução dos agentes do fluxo.',
+      model: 'gpt-4.1',
+      prompt: AGENT_TEMPLATES.find((t) => t.id === 'supervisor-agent')?.defaultPrompt ?? '',
+      tools: ['langgraph', 'evaluation'],
+    },
+  },
+];
+
+export const useCanvasStore = create<CanvasStore>((set) => ({
+  nodes: defaultNodes,
+  edges: [],
+  selectedNodeId: defaultNodes[0].id,
   executionLogs: [
     '[boot] AgentOS canvas inicializado.',
     '[hint] Arraste agentes da sidebar para o canvas.',
@@ -165,3 +187,4 @@ export function findTemplateByAgentName(agentName: string): AgentTemplate | unde
     normalized.includes(template.name.toLowerCase().replace('agent', '')),
   );
 }
+}));

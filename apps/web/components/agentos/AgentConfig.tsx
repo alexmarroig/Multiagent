@@ -21,6 +21,9 @@ export default function AgentConfig() {
       <aside className="h-full w-80 border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Configuração</h2>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+      <aside className="h-full w-80 border-l bg-white p-4">
+        <h2 className="text-lg font-bold">Configuração</h2>
+        <p className="mt-2 text-sm text-slate-500">
           Selecione um nó para editar prompt, modelo e ferramentas.
         </p>
       </aside>
@@ -37,6 +40,14 @@ export default function AgentConfig() {
           Nome
           <input
             className={inputClassName}
+    <aside className="h-full w-80 border-l bg-white p-4">
+      <h2 className="mb-4 text-lg font-bold">Configuração do Agente</h2>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium">
+          Nome
+          <input
+            className="mt-1 w-full rounded border p-2 text-sm"
             value={selectedNode.data.label}
             onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value })}
           />
@@ -46,6 +57,10 @@ export default function AgentConfig() {
           Modelo
           <input
             className={inputClassName}
+        <label className="block text-sm font-medium">
+          Modelo
+          <input
+            className="mt-1 w-full rounded border p-2 text-sm"
             value={selectedNode.data.model}
             onChange={(e) => updateNodeData(selectedNode.id, { model: e.target.value })}
           />
@@ -55,6 +70,10 @@ export default function AgentConfig() {
           Prompt
           <textarea
             className={`${inputClassName} h-32`}
+        <label className="block text-sm font-medium">
+          Prompt
+          <textarea
+            className="mt-1 h-32 w-full rounded border p-2 text-sm"
             value={selectedNode.data.prompt}
             onChange={(e) => updateNodeData(selectedNode.id, { prompt: e.target.value })}
           />
@@ -64,6 +83,10 @@ export default function AgentConfig() {
           Ferramentas (CSV)
           <input
             className={inputClassName}
+        <label className="block text-sm font-medium">
+          Ferramentas (CSV)
+          <input
+            className="mt-1 w-full rounded border p-2 text-sm"
             value={selectedNode.data.tools.join(', ')}
             onChange={(e) =>
               updateNodeData(selectedNode.id, {
