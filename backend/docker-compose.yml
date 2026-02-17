@@ -14,6 +14,8 @@ services:
       - redis
       - chromadb
 
+  # Placeholder only: this container does not build/serve apps/web.
+  # Run the real frontend from the monorepo root with `pnpm dev:web`.
   frontend:
     image: node:20-alpine
     working_dir: /workspace
