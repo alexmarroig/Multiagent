@@ -45,6 +45,31 @@ export function useAgentStream(sessionId: string | null) {
         setIsConnected(false);
       }
     };
+    const wsBase = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:8000';
+    const ws = new WebSocket(`${wsBase}/ws/${sessionId}`);
+
+    ws.onopen = () => setIsConnected(true);
+    ws.onmessage = ({ data }) => {
+      try {
+        const parsed = JSON.parse(data) as Omit<AgentEvent, 'content'> & { content: unknown };
+        const content = typeof parsed.content === 'string' ? parsed.content : JSON.stringify(parsed.content);
+        const event: AgentEvent = { ...parsed, content };
+        setEvents((prev) => [...prev, event]);
+
+        if (event.event_type === 'done') {
+          setIsDone(true);
+          setIsConnected(false);
+        }
+        if (event.event_type === 'error') {
+          setError(content);
+          setIsDone(true);
+          setIsConnected(false);
+        }
+      } catch {
+        // Ignora payload inválido sem quebrar a UI.
+      }
+    };
+
     ws.onclose = () => setIsConnected(false);
     ws.onerror = () => {
       setIsConnected(false);
@@ -52,6 +77,8 @@ export function useAgentStream(sessionId: string | null) {
     };
     wsRef.current = ws;
 
+
+    wsRef.current = ws;
     return () => ws.close();
   }, [sessionId]);
 

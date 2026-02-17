@@ -55,6 +55,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     category: 'travel',
     description: 'Pesquisa voos/hotéis e sugere roteiro com otimização de custo.',
     defaultTools: ['travel', 'search', 'browser'],
+    defaultTools: ['browser', 'search', 'calendar', 'travel'],
     defaultPrompt: 'Planeje uma viagem completa com foco em custo-benefício.',
   },
   {
@@ -95,6 +96,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     category: 'supervisor',
     description: 'Coordena os demais agentes e valida resultados.',
     defaultTools: [],
+    defaultTools: ['search'],
     defaultPrompt: 'Orquestre o fluxo, valide qualidade e consolide saída final.',
   },
 ];

@@ -23,6 +23,7 @@ def create_excel_spreadsheet(data_json: str, title: str = "Relatório", filename
         data = json.loads(data_json)
         if not isinstance(data, list) or not data:
             return "Erro: data_json deve ser uma lista de objetos com dados."
+            return json.dumps({"success": False, "error": "data_json deve ser uma lista de objetos com dados."}, ensure_ascii=False)
 
         wb = Workbook()
         ws = wb.active
@@ -81,3 +82,15 @@ def create_excel_spreadsheet(data_json: str, title: str = "Relatório", filename
         return str(output_path)
     except Exception as exc:
         return f"Erro ao criar planilha: {exc}"
+        return json.dumps(
+            {
+                "success": True,
+                "message": "Planilha criada com sucesso.",
+                "artifact_id": output_path.name,
+                "artifact_path": str(output_path),
+                "format": "xlsx",
+            },
+            ensure_ascii=False,
+        )
+    except Exception as exc:
+        return json.dumps({"success": False, "error": f"Erro ao criar planilha: {exc}"}, ensure_ascii=False)

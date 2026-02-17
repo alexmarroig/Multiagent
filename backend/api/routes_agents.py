@@ -14,6 +14,10 @@ from auth.dependencies import get_current_user
 from db.supabase_client import get_supabase
 from models.schemas import FlowConfig
 from orchestrator.crew_builder import build_crew_from_config
+
+from fastapi import APIRouter, BackgroundTasks
+
+from models.schemas import FlowConfig
 from orchestrator.event_stream import make_event, publish_event
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -114,6 +118,29 @@ async def execute_flow(flow: FlowConfig) -> None:
             )
             .eq("session_id", flow.session_id)
             .execute()
+    await publish_event(
+        flow.session_id,
+        make_event(flow.session_id, "system", "AgentOS", "thinking", "Iniciando execução do fluxo"),
+    )
+    try:
+        from orchestrator.crew_builder import build_crew_from_config
+
+        crew = build_crew_from_config(flow)
+        await asyncio.to_thread(crew.kickoff, inputs=flow.inputs)
+        await publish_event(
+            flow.session_id,
+            make_event(flow.session_id, "system", "AgentOS", "done", "Execução finalizada"),
+        )
+    except Exception as exc:
+        await publish_event(
+            flow.session_id,
+            make_event(
+                flow.session_id,
+                "system",
+                "AgentOS",
+                "error",
+                {"error": str(exc), "trace": traceback.format_exc()},
+            ),
         )
 
 
@@ -140,6 +167,9 @@ async def run_flow(
         .execute()
     )
 
+async def run_flow(flow: FlowConfig, background_tasks: BackgroundTasks) -> dict:
+    session_id = flow.session_id or str(uuid.uuid4())
+    flow = flow.model_copy(update={"session_id": session_id})
     background_tasks.add_task(execute_flow, flow)
     return {"session_id": session_id, "status": "running"}
 
@@ -155,6 +185,10 @@ async def list_templates() -> list[dict]:
             "agents": ["travel", "financial", "meeting"],
             "color": "orange",
             "inputs": ["destination", "checkin", "checkout", "budget_brl", "adults"],
+            "description": "Pesquisa, reserva e consolidação de custos.",
+            "agents": ["travel", "financial", "meeting", "supervisor"],
+            "color": "orange",
+            "inputs": ["destination", "budget_brl", "days"],
         },
         {
             "id": "marketing_company",
@@ -163,6 +197,10 @@ async def list_templates() -> list[dict]:
             "agents": ["marketing", "excel", "phone", "supervisor"],
             "color": "blue",
             "inputs": ["product", "audience"],
+            "description": "Pesquisa de mercado e execução de campanhas.",
+            "agents": ["marketing", "financial", "excel", "supervisor"],
+            "color": "blue",
+            "inputs": ["segment", "product", "goal"],
         },
         {
             "id": "financial_office",
@@ -171,6 +209,10 @@ async def list_templates() -> list[dict]:
             "agents": ["financial", "excel", "supervisor"],
             "color": "green",
             "inputs": ["tickers", "period"],
+            "description": "Análise financeira e geração de relatório executivo.",
+            "agents": ["financial", "excel", "meeting", "supervisor"],
+            "color": "green",
+            "inputs": ["ticker", "period"],
         },
         {
             "id": "executive_assistant",
@@ -179,5 +221,9 @@ async def list_templates() -> list[dict]:
             "agents": ["meeting", "phone", "supervisor"],
             "color": "purple",
             "inputs": ["date", "attendees", "phone_number"],
+            "description": "Organização de agenda com comunicações automáticas.",
+            "agents": ["meeting", "phone", "travel", "supervisor"],
+            "color": "purple",
+            "inputs": ["attendees", "meeting_topic", "timeslots"],
         },
     ]

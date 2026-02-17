@@ -26,6 +26,51 @@ function mapAgentNameToTemplate(agentName: string): AgentTemplate | null {
   const mappedId = AGENT_ALIAS[normalized];
   if (!mappedId) return null;
   return AGENT_TEMPLATES.find((t) => t.id === mappedId) ?? null;
+const SUPPORTED_AGENT_TYPES = ['financial', 'travel', 'meeting', 'phone', 'excel', 'marketing', 'supervisor'] as const;
+
+const AGENT_ALIASES: Record<string, (typeof SUPPORTED_AGENT_TYPES)[number]> = {
+  calendar: 'meeting',
+};
+
+type TemplateValidation = {
+  invalidAgents: string[];
+  normalizedAgents: string[];
+  aliasWarnings: string[];
+};
+
+function mapAgentNameToTemplate(agentName: string): AgentTemplate | null {
+  const normalized = agentName.toLowerCase();
+  const exact = AGENT_TEMPLATES.find((t) => normalized.includes(t.name.toLowerCase().replace('agent', '')));
+  return exact ?? null;
+}
+
+function validateTemplateAgents(template: Template): TemplateValidation {
+  const invalidAgents: string[] = [];
+  const normalizedAgents: string[] = [];
+  const aliasWarnings: string[] = [];
+
+  template.agents.forEach((agent) => {
+    const normalized = agent.toLowerCase();
+    const alias = AGENT_ALIASES[normalized];
+    const resolved = alias ?? normalized;
+
+    if (alias) {
+      aliasWarnings.push(`Alias aplicado em ${template.id}: ${agent} -> ${alias}`);
+    }
+
+    if (SUPPORTED_AGENT_TYPES.includes(resolved as (typeof SUPPORTED_AGENT_TYPES)[number])) {
+      normalizedAgents.push(resolved);
+      return;
+    }
+
+    invalidAgents.push(agent);
+  });
+
+  return {
+    invalidAgents,
+    normalizedAgents,
+    aliasWarnings,
+  };
 }
 
 export default function TemplateGallery({ onClose, onTemplateApplied }: TemplateGalleryProps) {
@@ -51,6 +96,8 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
         name: 'Empresa de Marketing',
         description: 'marketing → excel → phone → supervisor',
         agents: ['marketing', 'excel', 'phone', 'supervisor'],
+        description: 'marketing → financial → excel → phone',
+        agents: ['marketing', 'financial', 'excel', 'phone'],
         color: 'blue',
         inputs: ['product', 'audience'],
       },
@@ -67,6 +114,8 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
         name: 'Assistente Executivo',
         description: 'meeting → phone → supervisor',
         agents: ['meeting', 'phone', 'supervisor'],
+        description: 'meeting → phone → calendar → supervisor',
+        agents: ['meeting', 'phone', 'calendar', 'supervisor'],
         color: 'purple',
         inputs: ['date', 'attendees', 'phone_number'],
       },
@@ -77,6 +126,22 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
   const source = templates.length ? templates : fallbackTemplates;
 
   const applyTemplate = (template: Template) => {
+  const templateValidation = useMemo(() => {
+    const validations = source.map((template) => ({
+      template,
+      validation: validateTemplateAgents(template),
+    }));
+
+    validations.forEach(({ validation }) => {
+      validation.aliasWarnings.forEach((warning) => {
+        console.warn(`[TemplateGallery] ${warning}`);
+      });
+    });
+
+    return validations;
+  }, [source]);
+
+  const applyTemplate = (template: Template, normalizedAgents: string[]) => {
     if (nodes.length > 0 && !window.confirm('Limpar canvas atual e aplicar template?')) {
       return;
     }
@@ -88,6 +153,12 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
 
     const generatedNodes: Node<AgentNodeData>[] = mappedTemplates.map((mapped, index) => {
       const agent = mapped as AgentTemplate;
+    const generatedNodes: Node<AgentNodeData>[] = normalizedAgents.map((agent, index) => {
+      const mapped = mapAgentNameToTemplate(agent);
+      if (!mapped) {
+        throw new Error(`Agente sem template mapeado: ${agent}`);
+      }
+
       return {
         id: `tpl-${template.id}-${index}`,
         type: 'agentNode',
@@ -102,6 +173,12 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
           model: 'gpt-4.1-mini',
           prompt: agent.defaultPrompt,
           tools: agent.defaultTools,
+          label: mapped.name,
+          category: mapped.category,
+          description: mapped.description,
+          model: 'gpt-4.1-mini',
+          prompt: mapped.defaultPrompt,
+          tools: mapped.defaultTools,
           status: 'idle',
         },
       };
@@ -168,6 +245,34 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
             </article>
           );
         })}
+        {templateValidation.map(({ template, validation }) => (
+          <article key={template.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+            <p className="text-2xl">{template.color === 'orange' ? '🟠' : template.color === 'blue' ? '🔵' : template.color === 'green' ? '🟢' : '🟣'}</p>
+            <h4 className="mt-2 text-base font-bold">{template.name}</h4>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{template.description}</p>
+            {validation.invalidAgents.length > 0 && (
+              <p className="mt-2 inline-flex rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                Erro de template: agente desconhecido ({validation.invalidAgents.join(', ')})
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-1">
+              {template.agents.map((agent) => (
+                <span key={`${template.id}-${agent}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase dark:bg-slate-800">
+                  {agent}
+                </span>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Inputs: {template.inputs.join(', ')}</p>
+            <button
+              type="button"
+              onClick={() => applyTemplate(template, validation.normalizedAgents)}
+              disabled={validation.invalidAgents.length > 0}
+              className="mt-3 rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Usar Template
+            </button>
+          </article>
+        ))}
       </div>
     </section>
   );

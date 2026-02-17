@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadExcel } from '@/lib/api';
+import { downloadArtifactExcel, downloadExcel } from '@/lib/api';
 import type { AgentEvent, EventType } from '@/hooks/useAgentStream';
 
 type ExecutionConsoleProps = {
@@ -9,6 +10,11 @@ type ExecutionConsoleProps = {
   isConnected: boolean;
   isDone: boolean;
   error: string | null;
+};
+
+type ArtifactPayload = {
+  artifact_id?: string;
+  artifact_path?: string;
 };
 
 const EVENT_STYLE: Record<EventType, { icon: string; badge: string; bg: string }> = {
@@ -27,6 +33,22 @@ function relativeTime(isoDate: string): string {
   return `há ${minutes}min`;
 }
 
+function parseArtifactEvent(event: AgentEvent): ArtifactPayload | null {
+  if (event.event_type !== 'result') return null;
+  const content = typeof event.content === 'string' ? event.content : '';
+  if (!content) return null;
+
+  try {
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const artifactId = typeof parsed.artifact_id === 'string' ? parsed.artifact_id : undefined;
+    const artifactPath = typeof parsed.artifact_path === 'string' ? parsed.artifact_path : undefined;
+    const hasXlsx = (artifactId ?? artifactPath ?? '').toLowerCase().endsWith('.xlsx');
+    return hasXlsx ? { artifact_id: artifactId, artifact_path: artifactPath } : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function ExecutionConsole({ events, isConnected, isDone, error }: ExecutionConsoleProps) {
   const [hiddenUntil, setHiddenUntil] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -42,6 +64,17 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
   );
 
   const excelMentioned = visibleEvents.some((event) => event.content.includes('.xlsx'));
+  const latestExcelArtifact = useMemo(() => {
+    for (let idx = visibleEvents.length - 1; idx >= 0; idx -= 1) {
+      const artifact = parseArtifactEvent(visibleEvents[idx]);
+      if (artifact) return artifact;
+    }
+    return null;
+  }, [visibleEvents]);
+
+  const excelMentioned = Boolean(
+    latestExcelArtifact || visibleEvents.some((event) => String(event.content).toLowerCase().includes('.xlsx')),
+  );
 
   const copyAll = async () => {
     const text = visibleEvents
@@ -51,6 +84,11 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
   };
 
   const downloadExcelFromResult = async () => {
+    if (latestExcelArtifact) {
+      await downloadArtifactExcel(latestExcelArtifact);
+      return;
+    }
+
     await downloadExcel({
       title: 'Resultado AgentOS',
       data: visibleEvents.map((event) => ({
@@ -104,6 +142,7 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
               </div>
               <p className={`whitespace-pre-wrap text-xs ${event.event_type === 'result' ? 'font-semibold text-emerald-200' : 'text-slate-200'}`}>
                 {event.content}
+                {String(event.content)}
               </p>
             </article>
           );
