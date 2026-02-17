@@ -18,6 +18,7 @@ from tools.excel_tools import create_excel_spreadsheet
 from tools.finance_tools import get_stock_data
 from tools.phone_tools import make_phone_call
 from tools.search_tools import web_search
+from tools.tool_ids import normalize_tool_ids
 
 DEFAULT_PROMPTS: dict[AgentType, str] = {
     AgentType.financial: "Analista financeiro sênior especializado em análise quantitativa e Excel",
@@ -57,7 +58,8 @@ def _build_llm(provider: LLMProvider, model: str):
 
 def _resolve_tools(tool_names: list[str]) -> list[Any]:
     tools: list[Any] = []
-    for name in tool_names:
+    normalized_tool_names, _ = normalize_tool_ids(tool_names)
+    for name in normalized_tool_names:
         if name in TOOL_REGISTRY:
             tools.append(TOOL_REGISTRY[name])
     return tools

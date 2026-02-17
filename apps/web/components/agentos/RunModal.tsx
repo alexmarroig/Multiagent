@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { normalizeToolIds } from '@/shared/tool_ids';
 import type { Node } from 'reactflow';
 import { runFlow, type FlowPayload } from '@/lib/api';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
@@ -42,6 +43,12 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
     setExtraInputs((prev) => ({ ...prev, [key]: value }));
   };
 
+  const toolNormalizationWarnings = useMemo(() => {
+    return nodes
+      .map((node) => ({ label: node.data.label, ...normalizeToolIds(node.data.tools) }))
+      .filter((node) => node.unmapped.length > 0);
+  }, [nodes]);
+
   const handleSubmit = async () => {
     if (!objective.trim()) return;
 
@@ -58,7 +65,7 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
           model: node.data.model,
           provider: 'anthropic',
           system_prompt: node.data.prompt,
-          tools: node.data.tools,
+          tools: normalizeToolIds(node.data.tools).normalized,
         })),
         edges: edges.map((edge) => ({
           id: edge.id,
@@ -88,6 +95,19 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
         </p>
 
         <div className="mt-4 space-y-4">
+        {toolNormalizationWarnings.length > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            <p className="font-semibold">Algumas tools não puderam ser mapeadas e serão ignoradas:</p>
+            <ul className="mt-1 list-disc pl-5">
+              {toolNormalizationWarnings.map((warning) => (
+                <li key={warning.label}>
+                  <span className="font-medium">{warning.label}</span>: {warning.unmapped.join(', ')}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
           <label className="block text-sm font-medium">
             Descreva o objetivo dos agentes
             <textarea
