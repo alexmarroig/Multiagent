@@ -24,11 +24,7 @@ async def execute_flow(flow: FlowConfig) -> None:
         from orchestrator.crew_builder import build_crew_from_config
 
         crew = build_crew_from_config(flow)
-        result = await asyncio.to_thread(crew.kickoff, inputs=flow.inputs)
-        await publish_event(
-            flow.session_id,
-            make_event(flow.session_id, "supervisor", "SupervisorAgent", "result", str(result)),
-        )
+        await asyncio.to_thread(crew.kickoff, inputs=flow.inputs)
         await publish_event(
             flow.session_id,
             make_event(flow.session_id, "system", "AgentOS", "done", "Execução finalizada"),
