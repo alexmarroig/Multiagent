@@ -14,6 +14,19 @@ type RunModalProps = {
   onRun: (sessionId: string) => void;
 };
 
+const TOOL_ALIASES: Record<string, string> = {
+  yfinance: 'finance',
+  openpyxl: 'excel',
+  twilio: 'phone',
+  tavily: 'search',
+  playwright: 'browser',
+  'google-calendar': 'calendar',
+};
+
+function normalizeTools(tools: string[]): string[] {
+  return tools.map((tool) => TOOL_ALIASES[tool] ?? tool).filter((tool, idx, arr) => arr.indexOf(tool) === idx);
+}
+
 function mapCategoryToAgentType(category: string, label: string): string {
   if (category === 'utility') {
     return label.toLowerCase().includes('meeting') ? 'meeting' : 'supervisor';
@@ -65,6 +78,7 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
           model: node.data.model,
           provider: 'anthropic',
           system_prompt: node.data.prompt,
+          tools: normalizeTools(node.data.tools),
           tools: normalizeToolIds(node.data.tools).normalized,
         })),
         edges: edges.map((edge) => ({

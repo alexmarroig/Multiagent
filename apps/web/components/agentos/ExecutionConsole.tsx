@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { downloadExcel } from '@/lib/api';
 import { downloadArtifactExcel, downloadExcel } from '@/lib/api';
 import type { AgentEvent, EventType } from '@/hooks/useAgentStream';
 
@@ -62,6 +63,7 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
     [events, hiddenUntil],
   );
 
+  const excelMentioned = visibleEvents.some((event) => event.content.includes('.xlsx'));
   const latestExcelArtifact = useMemo(() => {
     for (let idx = visibleEvents.length - 1; idx >= 0; idx -= 1) {
       const artifact = parseArtifactEvent(visibleEvents[idx]);
@@ -139,6 +141,7 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
                 <span className="text-[10px] text-slate-400">{relativeTime(event.timestamp)}</span>
               </div>
               <p className={`whitespace-pre-wrap text-xs ${event.event_type === 'result' ? 'font-semibold text-emerald-200' : 'text-slate-200'}`}>
+                {event.content}
                 {String(event.content)}
               </p>
             </article>

@@ -1,5 +1,11 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+function getAuthHeaders(): HeadersInit {
+  if (typeof window === 'undefined') return {};
+  const token = window.localStorage.getItem('agentos_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export interface NodePayload {
   id: string;
   agent_type: string;
@@ -41,6 +47,7 @@ export interface Template {
 export async function runFlow(payload: FlowPayload): Promise<RunResult> {
   const response = await fetch(`${BASE}/api/agents/run`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
@@ -71,6 +78,7 @@ export async function downloadExcel(config: {
 }) {
   const response = await fetch(`${BASE}/api/tools/excel/create`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
   });
@@ -122,6 +130,7 @@ export async function scheduleMeeting(config: {
 }) {
   const response = await fetch(`${BASE}/api/tools/calendar/schedule`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
   });
@@ -135,6 +144,7 @@ export async function makeCall(config: {
 }) {
   const response = await fetch(`${BASE}/api/tools/phone/call`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
   });

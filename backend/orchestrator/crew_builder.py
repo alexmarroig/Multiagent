@@ -134,6 +134,7 @@ def _build_llm(provider: LLMProvider, model: str):
 
 def _resolve_tools(tool_names: list[str]) -> list[Any]:
     tools: list[Any] = []
+    for name in tool_names:
     normalized_tool_names, _ = normalize_tool_ids(tool_names)
     for name in normalized_tool_names:
         if name in TOOL_REGISTRY:
@@ -204,6 +205,7 @@ def build_crew_from_config(flow: FlowConfig) -> Crew:
             ),
             expected_output=f"Saída estruturada e objetiva produzida por {node.label}.",
             agent=agent,
+        )
             callback=_make_task_callback(flow.session_id, node),
         )
         _wrap_task_execution(task, flow.session_id, node)

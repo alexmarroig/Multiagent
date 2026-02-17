@@ -43,6 +43,7 @@ class EdgeConfig(BaseModel):
 
 class FlowConfig(BaseModel):
     session_id: str = ""
+    user_id: str = ""
     nodes: list[NodeConfig] = Field(default_factory=list)
     edges: list[EdgeConfig] = Field(default_factory=list)
     inputs: dict[str, Any] = Field(default_factory=dict)

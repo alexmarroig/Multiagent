@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+
+from fastapi import APIRouter
 import os
 from pathlib import Path
 
@@ -51,11 +54,16 @@ def _resolve_artifact_path(artifact_id: str | None = None, artifact_path: str | 
 
 @router.post("/excel/create")
 async def create_excel(config: ExcelConfig):
+    output = create_excel_spreadsheet(
     raw_output = create_excel_spreadsheet(
         data_json=json.dumps(config.data, ensure_ascii=False),
         title=config.title,
         filename=config.filename,
     )
+    path = Path(output)
+    if path.exists():
+        return FileResponse(path=path, filename=path.name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return {"success": False, "error": output}
     is_json, payload = _parse_excel_tool_result(raw_output)
     if not payload.get("success", True):
         return payload if is_json else {"success": False, "error": raw_output}

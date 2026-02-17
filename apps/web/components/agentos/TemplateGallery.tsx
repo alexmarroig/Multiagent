@@ -11,6 +11,21 @@ type TemplateGalleryProps = {
   onTemplateApplied?: () => void;
 };
 
+const AGENT_ALIAS: Record<string, AgentTemplate['id']> = {
+  financial: 'financial-analyst',
+  travel: 'travel-agent',
+  meeting: 'meeting-agent',
+  phone: 'phone-agent',
+  excel: 'excel-agent',
+  marketing: 'marketing-agent',
+  supervisor: 'supervisor-agent',
+};
+
+function mapAgentNameToTemplate(agentName: string): AgentTemplate | null {
+  const normalized = agentName.toLowerCase().trim();
+  const mappedId = AGENT_ALIAS[normalized];
+  if (!mappedId) return null;
+  return AGENT_TEMPLATES.find((t) => t.id === mappedId) ?? null;
 const SUPPORTED_AGENT_TYPES = ['financial', 'travel', 'meeting', 'phone', 'excel', 'marketing', 'supervisor'] as const;
 
 const AGENT_ALIASES: Record<string, (typeof SUPPORTED_AGENT_TYPES)[number]> = {
@@ -79,6 +94,8 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       {
         id: 'marketing_company',
         name: 'Empresa de Marketing',
+        description: 'marketing → excel → phone → supervisor',
+        agents: ['marketing', 'excel', 'phone', 'supervisor'],
         description: 'marketing → financial → excel → phone',
         agents: ['marketing', 'financial', 'excel', 'phone'],
         color: 'blue',
@@ -95,6 +112,8 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       {
         id: 'executive_assistant',
         name: 'Assistente Executivo',
+        description: 'meeting → phone → supervisor',
+        agents: ['meeting', 'phone', 'supervisor'],
         description: 'meeting → phone → calendar → supervisor',
         agents: ['meeting', 'phone', 'calendar', 'supervisor'],
         color: 'purple',
@@ -105,6 +124,8 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
   );
 
   const source = templates.length ? templates : fallbackTemplates;
+
+  const applyTemplate = (template: Template) => {
   const templateValidation = useMemo(() => {
     const validations = source.map((template) => ({
       template,
@@ -125,6 +146,13 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       return;
     }
 
+    const mappedTemplates = template.agents.map(mapAgentNameToTemplate);
+    if (mappedTemplates.some((item) => !item)) {
+      return;
+    }
+
+    const generatedNodes: Node<AgentNodeData>[] = mappedTemplates.map((mapped, index) => {
+      const agent = mapped as AgentTemplate;
     const generatedNodes: Node<AgentNodeData>[] = normalizedAgents.map((agent, index) => {
       const mapped = mapAgentNameToTemplate(agent);
       if (!mapped) {
@@ -139,6 +167,12 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
           y: 120 + Math.floor(index / 3) * 180,
         },
         data: {
+          label: agent.name,
+          category: agent.category,
+          description: agent.description,
+          model: 'gpt-4.1-mini',
+          prompt: agent.defaultPrompt,
+          tools: agent.defaultTools,
           label: mapped.name,
           category: mapped.category,
           description: mapped.description,
@@ -180,6 +214,37 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {source.map((template) => {
+          const invalidAgents = template.agents.filter((agent) => !mapAgentNameToTemplate(agent));
+          const isInvalid = invalidAgents.length > 0;
+
+          return (
+            <article key={template.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+              <p className="text-2xl">{template.color === 'orange' ? '🟠' : template.color === 'blue' ? '🔵' : template.color === 'green' ? '🟢' : '🟣'}</p>
+              <h4 className="mt-2 text-base font-bold">{template.name}</h4>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{template.description}</p>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {template.agents.map((agent) => (
+                  <span key={`${template.id}-${agent}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase dark:bg-slate-800">
+                    {agent}
+                  </span>
+                ))}
+              </div>
+              {isInvalid && (
+                <p className="mt-2 text-xs text-red-400">Template inválido: agentes não suportados ({invalidAgents.join(', ')})</p>
+              )}
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Inputs: {template.inputs.join(', ')}</p>
+              <button
+                type="button"
+                onClick={() => applyTemplate(template)}
+                disabled={isInvalid}
+                className="mt-3 rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Usar Template
+              </button>
+            </article>
+          );
+        })}
         {templateValidation.map(({ template, validation }) => (
           <article key={template.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
             <p className="text-2xl">{template.color === 'orange' ? '🟠' : template.color === 'blue' ? '🔵' : template.color === 'green' ? '🟢' : '🟣'}</p>
