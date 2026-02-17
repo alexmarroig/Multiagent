@@ -46,7 +46,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     name: 'FinancialAnalystAgent',
     category: 'financial',
     description: 'Análise financeira, DRE, fluxo de caixa e geração de Excel.',
-    defaultTools: ['yfinance', 'pandas', 'openpyxl'],
+    defaultTools: ['finance', 'excel'],
     defaultPrompt: 'Analise os dados financeiros e gere recomendações acionáveis.',
   },
   {
@@ -54,7 +54,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     name: 'TravelAgent',
     category: 'travel',
     description: 'Pesquisa voos/hotéis e sugere roteiro com otimização de custo.',
-    defaultTools: ['playwright', 'tavily', 'calendar'],
+    defaultTools: ['browser', 'search', 'calendar', 'travel'],
     defaultPrompt: 'Planeje uma viagem completa com foco em custo-benefício.',
   },
   {
@@ -62,7 +62,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     name: 'MeetingAgent',
     category: 'utility',
     description: 'Agenda reuniões e faz follow-up automático.',
-    defaultTools: ['google-calendar', 'apscheduler', 'email-api'],
+    defaultTools: ['calendar'],
     defaultPrompt: 'Organize agenda, convites e lembretes automaticamente.',
   },
   {
@@ -70,7 +70,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     name: 'PhoneAgent',
     category: 'phone',
     description: 'Dispara ligações automatizadas via Twilio com script customizado.',
-    defaultTools: ['twilio', 'tts', 'stt'],
+    defaultTools: ['phone'],
     defaultPrompt: 'Realize ligações objetivas com roteiro profissional.',
   },
   {
@@ -78,7 +78,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     name: 'ExcelAgent',
     category: 'excel',
     description: 'Cria planilhas, dashboards e fórmulas automaticamente.',
-    defaultTools: ['openpyxl', 'pandas'],
+    defaultTools: ['excel'],
     defaultPrompt: 'Construa uma planilha executiva com gráficos e insights.',
   },
   {
@@ -86,7 +86,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     name: 'MarketingAgent',
     category: 'marketing',
     description: 'Pesquisa mercado e gera campanhas com assets textuais.',
-    defaultTools: ['tavily', 'email-api'],
+    defaultTools: ['search'],
     defaultPrompt: 'Crie uma campanha completa com abordagem de alto ROI.',
   },
   {
@@ -94,7 +94,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     name: 'SupervisorAgent',
     category: 'supervisor',
     description: 'Coordena os demais agentes e valida resultados.',
-    defaultTools: ['langgraph', 'evaluation'],
+    defaultTools: ['search'],
     defaultPrompt: 'Orquestre o fluxo, valide qualidade e consolide saída final.',
   },
 ];
