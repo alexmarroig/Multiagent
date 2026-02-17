@@ -88,6 +88,31 @@ export async function downloadExcel(config: {
   URL.revokeObjectURL(url);
 }
 
+
+
+export async function downloadArtifactExcel(config: { artifact_id?: string; artifact_path?: string }) {
+  const params = new URLSearchParams();
+  if (config.artifact_id) params.set('artifact_id', config.artifact_id);
+  if (config.artifact_path) params.set('artifact_path', config.artifact_path);
+
+  const response = await fetch(`${BASE}/api/tools/artifacts/download?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error('Falha ao baixar artefato Excel');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+
+  const filenameFromHeader = response.headers
+    .get('content-disposition')
+    ?.match(/filename=\"?([^\";]+)\"?/)?.[1];
+
+  link.download = filenameFromHeader ?? config.artifact_id ?? 'relatorio.xlsx';
+  link.click();
+  URL.revokeObjectURL(url);
+}
 export async function scheduleMeeting(config: {
   title: string;
   start_datetime: string;
