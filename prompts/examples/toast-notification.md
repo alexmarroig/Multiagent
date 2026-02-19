@@ -1,12 +1,21 @@
-# Exemplo Few-Shot 1: Toast Notification Component
+# Exemplo Prático 1: Componente Toast
 
-## Input
-"Preciso de um componente Toast com tipos success/error/warning/info e auto-dismiss em 5s."
+## Input (pedido)
+```text
+Preciso de um componente Toast de notificação para o AgentOS.
+Deve suportar 4 tipos: success, error, warning, info.
+Deve aparecer no canto superior direito e desaparecer após 5s.
+```
 
-## Output (resumo)
-- Estrutura esperada: `Toast.tsx`, `ToastContainer.tsx`, `useToast.ts`, `Toast.test.tsx`
-- Requisitos: posição top-right, animação entrada/saída, acessibilidade, suporte a múltiplos toasts
+## Output esperado (resumo do prompt final)
+- Definir contexto: Next.js 14 + TypeScript + Tailwind + Framer Motion
+- Estrutura de arquivos:
+  - `components/ui/Toast.tsx`
+  - `components/ui/ToastContainer.tsx`
+  - `components/ui/useToast.ts`
+  - `components/ui/Toast.test.tsx`
+- Requisitos: auto-dismiss, fechar manual, acessibilidade, múltiplos toasts
 - Testes mínimos:
   1. renderiza mensagem
-  2. fecha automaticamente
-  3. fecha ao clicar no botão
+  2. fecha após duração
+  3. fecha no clique do botão

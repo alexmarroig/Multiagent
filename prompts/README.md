@@ -1,27 +1,36 @@
-# Biblioteca de Prompts Codex para AgentOS
+# Biblioteca de Prompts Prontos (AgentOS)
 
-Este diretório centraliza templates para acelerar a criação de prompts de engenharia de software para o fluxo Claude → Codex no AgentOS.
+Coleção de templates para acelerar pedidos ao Codex com padrão de qualidade consistente.
 
 ## Estrutura
 
-- `frontend/`: templates para componentes, páginas, hooks e formulários.
-- `backend/`: templates para endpoints, schemas, tools e integrações.
-- `infra/`: templates para Docker, CI e deploy.
-- `examples/`: exemplos few-shot completos.
+```text
+prompts/
+├── contract.md
+├── system-prompt.md
+├── frontend/
+│   ├── component.md
+│   ├── form.md
+│   ├── hook.md
+│   └── page.md
+├── backend/
+│   ├── endpoint.md
+│   ├── integration.md
+│   ├── schema.md
+│   └── tool.md
+├── infra/
+│   ├── ci.md
+│   ├── deploy.md
+│   └── docker.md
+└── examples/
+    ├── backend-endpoint.md
+    └── toast-notification.md
+```
 
-## Como usar
+## Regras de uso
 
-1. Escolha um template por tipo de tarefa.
-2. Preencha os campos entre colchetes (`[CAMPO]`) com o contexto real.
-3. Garanta que as seções CONTEXTO / INSTRUÇÕES / TAREFA / SAÍDA ESPERADA estejam completas.
-4. Execute o checklist final antes de enviar para o Codex.
-
-## Checklist rápido
-
-- [ ] 8 seções preenchidas
-- [ ] >= 2 exemplos few-shot
-- [ ] >= 3 testes mínimos definidos
-- [ ] Critérios de sucesso mensuráveis
-- [ ] Estrutura de arquivos clara
-- [ ] Dependências com versões
-- [ ] Estratégia de validação pré-commit
+1. Sempre use **CONTEXTO / INSTRUÇÕES / TAREFA / SAÍDA ESPERADA**.
+2. Complete as 8 seções quando usar `contract.md`.
+3. Inclua no mínimo **2 few-shots** e **3 testes mínimos**.
+4. Defina critérios objetivos para build, lint, testes e type-check.
+5. Antes de enviar ao Codex, revise com o checklist final.

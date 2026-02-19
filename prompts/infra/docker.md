@@ -1,4 +1,4 @@
-# [DOCKERFILE / CONTAINERIZAÇÃO]
+# [DOCKER]
 
 ## 1. CONTEXTO
 Serviço: [frontend/backend/worker]
@@ -6,13 +6,13 @@ Base image: [node/python]
 
 ## 2. INSTRUÇÕES
 - [ ] Build reproduzível
-- [ ] Camadas otimizadas
+- [ ] Otimização de camadas
 - [ ] Usuário não-root
-- [ ] Healthcheck
+- [ ] Healthcheck configurado
 
 ## 3. TAREFA
-Gerar Dockerfile para [serviço].
+Gerar Dockerfile para [serviço] em multi-stage.
 
 ## 4. SAÍDA ESPERADA
-- Dockerfile multi-stage
-- Comandos de build e run documentados
+- Dockerfile pronto para produção
+- Comandos de build/run documentados

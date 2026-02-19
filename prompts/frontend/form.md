@@ -1,18 +1,18 @@
-# [FORMULÁRIO]
+# [NOME DO FORMULÁRIO]
 
 ## 1. CONTEXTO
 Projeto: AgentOS Frontend
-Feature: [nome do fluxo]
+Fluxo: [cadastro/login/configuração]
 
 ## 2. INSTRUÇÕES
-- [ ] Validação de campos
-- [ ] Mensagens de erro claras
-- [ ] Estado de envio (submitting)
-- [ ] Acessibilidade e teclado
+- [ ] Validar campos obrigatórios
+- [ ] Mostrar erros por campo
+- [ ] Estado de submit (idle/loading/success/error)
+- [ ] Acessibilidade via labels e teclado
 
 ## 3. TAREFA
-Construir formulário com campos [A, B, C] e submit para [endpoint].
+Construir formulário com campos [A, B, C] e integração com [endpoint].
 
 ## 4. SAÍDA ESPERADA
-- Componente com tipagem explícita
-- Testes para caso feliz + validação + erro de rede
+- Componente tipado com validação
+- Testes: submit sucesso, erro de validação, erro de rede

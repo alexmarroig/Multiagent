@@ -1,21 +1,24 @@
-# [TOOL CREWAI]
+# [NOME DA TOOL]
 
 ## 1. CONTEXTO
 Projeto: AgentOS Backend
 Arquivo alvo: `backend/tools/[nome]_tools.py`
 
 ## 2. INSTRUÇÕES
-- [ ] Decorator `@tool`
-- [ ] Timeout e retry
-- [ ] Erros descritivos
+- [ ] Usar decorator `@tool`
+- [ ] Timeout de 30s
+- [ ] Retry (3 tentativas)
+- [ ] Error handling claro
 - [ ] Retorno serializável
 
 ## 3. TAREFA
-Criar ferramenta para [funcionalidade].
+Implementar tool para [funcionalidade] com integração a [serviço].
 
 ## 4. SAÍDA ESPERADA
-```py
+```python
+from crewai.tools import tool
+
 @tool("[nome_tool]")
-def [funcao]([params]) -> str:
+def [funcao_tool]([params]) -> str:
     ...
 ```

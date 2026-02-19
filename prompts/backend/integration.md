@@ -1,19 +1,22 @@
-# [INTEGRAÇÃO EXTERNA]
+# INTEGRAÇÃO: [NOME DA API]
 
 ## 1. CONTEXTO
-API externa: [nome]
-Arquivo: `backend/tools/[nome]_client.py`
+Projeto: AgentOS Backend
+Módulo: `tools/[nome]_tools.py`
+API externa: [nome] — [docs URL]
 
 ## 2. INSTRUÇÕES
-- [ ] API key via env
-- [ ] Retry 3x
-- [ ] Timeout 30s
-- [ ] Fallback em indisponibilidade
-- [ ] Mock para testes
+- [ ] API key via `.env`
+- [ ] Retry logic (3 tentativas)
+- [ ] Timeout de 30s
+- [ ] Error handling descritivo
+- [ ] Mock em testes
+- [ ] Fallback para indisponibilidade
 
 ## 3. TAREFA
-Implementar client HTTP e tool de uso.
+Implementar cliente e tool para [funcionalidade].
 
 ## 4. SAÍDA ESPERADA
-- Client isolado
-- Testes cobrindo timeout, 401, 500 e network error
+- `tools/[nome]_client.py`
+- `tools/[nome]_tools.py`
+- `tests/test_[nome]_tools.py`

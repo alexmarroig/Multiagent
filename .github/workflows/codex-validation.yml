@@ -9,21 +9,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Valida se PR tem tag [codex]
+      - name: Validar se PR tem tag [codex]
         run: |
-          if [[ "${{ github.event.pull_request.title }}" =~ \[codex\] ]]; then
-            echo "✅ PR gerada por Codex"
-          else
-            echo "ℹ️ PR sem tag [codex]"
+          if [[ ! "${{ github.event.pull_request.title }}" =~ \[codex\] ]]; then
+            echo "❌ O título da PR deve conter [codex]"
+            exit 1
           fi
+          echo "✅ PR gerada por Codex"
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install deps
-        run: npm ci
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
 
-      - name: Validate
+      - name: Validate generated code
         run: ./validate_codex_output.sh
