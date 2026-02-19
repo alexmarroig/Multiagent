@@ -1,0 +1,29 @@
+name: Codex-Generated Code Validation
+
+on:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Valida se PR tem tag [codex]
+        run: |
+          if [[ "${{ github.event.pull_request.title }}" =~ \[codex\] ]]; then
+            echo "✅ PR gerada por Codex"
+          else
+            echo "ℹ️ PR sem tag [codex]"
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Validate
+        run: ./validate_codex_output.sh
