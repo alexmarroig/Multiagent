@@ -1,8 +1,7 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
-function getAuthHeaders(): HeadersInit {
-  if (typeof window === 'undefined') return {};
-  const token = window.localStorage.getItem('agentos_token');
+function getAuthHeader() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('agentos_token') : null;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -35,18 +34,28 @@ export interface RunResult {
   ws_url: string;
 }
 
+export type Template = {
+  id: string;
+  name: string;
+  description: string;
+  agents: string[];
+  color: 'orange' | 'blue' | 'green' | 'purple';
+  inputs: string[];
+};
+
 export async function runFlow(payload: FlowPayload): Promise<RunResult> {
-  const response = await fetch(`${BASE}/api/agents/run`, {
+  const r = await fetch(`${BASE}/api/agents/run`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-  }
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`);
 
-  const data = (await response.json()) as { session_id: string; status: string };
+  const data = (await r.json()) as { session_id: string; status: string };
   return {
     session_id: data.session_id,
     status: data.status,
@@ -55,8 +64,8 @@ export async function runFlow(payload: FlowPayload): Promise<RunResult> {
 }
 
 export async function fetchTemplates(): Promise<{ templates: Template[] }> {
-  const response = await fetch(`${BASE}/api/agents/templates`);
-  const raw = (await response.json()) as Template[] | { templates: Template[] };
+  const r = await fetch(`${BASE}/api/agents/templates`);
+  const raw = (await r.json()) as Template[] | { templates: Template[] };
   const templates = Array.isArray(raw) ? raw : raw.templates;
   return { templates };
 }
@@ -66,22 +75,23 @@ export async function downloadExcel(config: {
   data: Record<string, unknown>[];
   filename?: string;
 }) {
-  const response = await fetch(`${BASE}/api/tools/excel/create`, {
+  const r = await fetch(`${BASE}/api/tools/excel/create`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
     body: JSON.stringify(config),
   });
 
-  if (!response.ok) {
-    throw new Error('Falha ao gerar Excel');
-  }
+  if (!r.ok) throw new Error('Falha ao gerar Excel');
 
-  const blob = await response.blob();
+  const blob = await r.blob();
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = config.filename ?? 'relatorio.xlsx';
-  link.click();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = config.filename ?? 'relatorio.xlsx';
+  a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -90,22 +100,23 @@ export async function downloadArtifactExcel(config: { artifact_id?: string; arti
   if (config.artifact_id) params.set('artifact_id', config.artifact_id);
   if (config.artifact_path) params.set('artifact_path', config.artifact_path);
 
-  const response = await fetch(`${BASE}/api/tools/artifacts/download?${params.toString()}`);
-  if (!response.ok) {
-    throw new Error('Falha ao baixar artefato Excel');
-  }
+  const r = await fetch(`${BASE}/api/tools/artifacts/download?${params.toString()}`, {
+    headers: {
+      ...getAuthHeader(),
+    },
+  });
 
-  const blob = await response.blob();
+  if (!r.ok) throw new Error('Falha ao baixar artefato Excel');
+
+  const blob = await r.blob();
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
+  const a = document.createElement('a');
+  a.href = url;
 
-  const filenameFromHeader = response.headers
-    .get('content-disposition')
-    ?.match(/filename="?([^";]+)"?/)?.[1];
+  const filenameFromHeader = r.headers.get('content-disposition')?.match(/filename="?([^";]+)"?/)?.[1];
 
-  link.download = filenameFromHeader ?? config.artifact_id ?? 'relatorio.xlsx';
-  link.click();
+  a.download = filenameFromHeader ?? config.artifact_id ?? 'relatorio.xlsx';
+  a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -116,12 +127,15 @@ export async function scheduleMeeting(config: {
   description?: string;
   attendees?: string[];
 }) {
-  const response = await fetch(`${BASE}/api/tools/calendar/schedule`, {
+  const r = await fetch(`${BASE}/api/tools/calendar/schedule`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
     body: JSON.stringify(config),
   });
-  return response.json();
+  return r.json();
 }
 
 export async function makeCall(config: {
@@ -129,18 +143,21 @@ export async function makeCall(config: {
   script: string;
   language?: string;
 }) {
-  const response = await fetch(`${BASE}/api/tools/phone/call`, {
+  const r = await fetch(`${BASE}/api/tools/phone/call`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+    },
     body: JSON.stringify(config),
   });
-  return response.json();
+  return r.json();
 }
 
 export async function healthCheck(): Promise<boolean> {
   try {
-    const response = await fetch(`${BASE}/health`);
-    return response.ok;
+    const r = await fetch(`${BASE}/health`);
+    return r.ok;
   } catch {
     return false;
   }

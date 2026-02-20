@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import type { Session, User } from '@supabase/supabase-js';
+import type { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
 interface Profile {
@@ -11,6 +11,7 @@ interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   role: 'user' | 'admin';
+  created_at: string;
 }
 
 export function useAuth() {
@@ -21,11 +22,11 @@ export function useAuth() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.user) {
-        fetchProfile(currentSession.user.id);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
       } else {
         setLoading(false);
       }
@@ -33,11 +34,11 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.user) {
-        fetchProfile(currentSession.user.id);
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
       } else {
         setProfile(null);
         setLoading(false);
@@ -48,23 +49,44 @@ export function useAuth() {
   }, []);
 
   async function fetchProfile(userId: string) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    if (data) setProfile(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+
+      if (error) throw error;
+      if (data) {
+        setProfile(data as Profile);
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          localStorage.setItem('agentos_token', session.access_token);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar perfil:', error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function signUp(email: string, password: string, fullName: string) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
     if (error) throw error;
     return data;
   }
 
   async function signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     if (error) throw error;
     router.push('/agentos');
     return data;
@@ -72,6 +94,7 @@ export function useAuth() {
 
   async function signOut() {
     await supabase.auth.signOut();
+    localStorage.removeItem('agentos_token');
     router.push('/login');
   }
 

@@ -5,12 +5,14 @@ import Link from 'next/link';
 import AgentCanvas from '@/components/agentos/AgentCanvas';
 import AgentConfig from '@/components/agentos/AgentConfig';
 import AgentSidebar from '@/components/agentos/AgentSidebar';
+import TemplateGallery from '@/components/agentos/TemplateGallery';
 import { healthCheck } from '@/lib/api';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function AgentOSPage() {
   const [darkMode, setDarkMode] = useState(true);
+  const [showTemplateTab, setShowTemplateTab] = useState(false);
   const backendOnline = useCanvasStore((s) => s.backendOnline);
   const setBackendOnline = useCanvasStore((s) => s.setBackendOnline);
   const saveFlow = useCanvasStore((s) => s.saveFlow);
@@ -35,7 +37,7 @@ export default function AgentOSPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400">Módulo 4 • Auth + Dashboard + Save/Load</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => setShowTemplateTab((prev) => !prev)}
@@ -54,37 +56,33 @@ export default function AgentOSPage() {
               {darkMode ? 'Light' : 'Dark'}
             </button>
 
-          <h1 className="text-lg font-bold">AgentOS Canvas</h1>
-          <div className="flex items-center gap-3">
-            <button onClick={handleSave} className="rounded bg-green-600 px-3 py-1.5 text-sm font-semibold text-white">💾 Salvar</button>
-            <button onClick={() => setDarkMode((prev) => !prev)} className="rounded border px-3 py-1.5 text-sm">{darkMode ? 'Light' : 'Dark'}</button>
             <div className="relative group">
               <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
                 <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium">
                   {profile?.full_name?.charAt(0) || profile?.email?.charAt(0) || 'U'}
                 </div>
-                <span className="text-sm font-medium">{profile?.full_name || profile?.email}</span>
+                <span className="text-sm font-medium hidden md:block">{profile?.full_name || profile?.email}</span>
               </button>
 
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 hidden group-hover:block">
+              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
                 <div className="py-1">
-                  <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400">{profile?.email}</div>
+                  <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                    {profile?.email}
+                  </div>
                   {profile?.role === 'admin' && (
                     <Link href="/admin" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
                       🛠️ Admin Dashboard
                     </Link>
                   )}
+                  <Link href="/debug" className="block px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700">
+                    🐛 Debug
+                  </Link>
                   <button
                     onClick={signOut}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     Sair
                   </button>
-              <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border hidden group-hover:block">
-                <div className="py-1">
-                  <div className="px-4 py-2 text-xs text-gray-500">{profile?.email}</div>
-                  {profile?.role === 'admin' && <Link href="/admin" className="block px-4 py-2 text-sm hover:bg-gray-100">🛠️ Admin Dashboard</Link>}
-                  <button onClick={signOut} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">Sair</button>
                 </div>
               </div>
             </div>
@@ -110,11 +108,6 @@ export default function AgentOSPage() {
               <AgentCanvas />
             </div>
           </div>
-        {!backendOnline && <div className="border-b bg-amber-100 px-4 py-2 text-sm">Backend offline — inicie o serviço</div>}
-
-        <div className="flex min-h-0 flex-1">
-          <AgentSidebar />
-          <div className="flex min-w-0 flex-1 flex-col"><div className="min-h-0 flex-1"><AgentCanvas /></div></div>
           <AgentConfig />
         </div>
       </div>
