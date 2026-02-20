@@ -1,8 +1,14 @@
 {
   "name": "agentic-dev-studio",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev:web": "pnpm --filter web dev",
+    "dev:web": "npm run dev --workspace web",
+    "build:web": "npm run build --workspace web",
+    "start": "npm run start --workspace web",
     "dev:orchestrator": "cd apps/orchestrator && ./run.sh",
     "dev:executor": "cd apps/executor && ./run.sh"
   },
