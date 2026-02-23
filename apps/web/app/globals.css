@@ -2,8 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Design tokens: dark-first premium palette with high-contrast typography. */
+  --bg-base: #040712;
+  --bg-elevated: #0a1020;
+  --surface-glass: rgba(255, 255, 255, 0.05);
+  --surface-border: rgba(255, 255, 255, 0.12);
+  --text-primary: #ffffff;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --accent: #22d3ee;
+  --accent-strong: #3b82f6;
+}
+
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 html,
@@ -11,24 +28,128 @@ body {
   margin: 0;
   padding: 0;
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  background: radial-gradient(circle at top, #14213d 0%, #080d1f 40%, #040712 100%);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
-.kinvo-shell {
+.premium-bg {
+  position: relative;
   background-image:
-    radial-gradient(circle at 12% 20%, rgba(56, 189, 248, 0.16) 0%, transparent 32%),
-    radial-gradient(circle at 90% 15%, rgba(59, 130, 246, 0.18) 0%, transparent 30%),
-    linear-gradient(145deg, rgba(3, 7, 18, 0.92) 0%, rgba(4, 12, 32, 0.95) 100%);
+    radial-gradient(circle at 18% 14%, rgba(59, 130, 246, 0.2), transparent 42%),
+    radial-gradient(circle at 85% 8%, rgba(34, 211, 238, 0.15), transparent 36%),
+    radial-gradient(circle at 50% 110%, rgba(14, 165, 233, 0.14), transparent 48%),
+    linear-gradient(180deg, #060c19 0%, #040712 48%, #04070f 100%);
 }
 
-.kinvo-glass,
-.kinvo-card {
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: linear-gradient(150deg, rgba(15, 23, 42, 0.82), rgba(15, 23, 42, 0.38));
-  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.45);
-  backdrop-filter: blur(18px);
+/* Grid and noise create depth without visual pollution. */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, black 35%, transparent 92%);
 }
 
-.kinvo-card {
-  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.36);
+.noise-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.08;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.45) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+}
+
+.spotlight {
+  position: absolute;
+  left: 10%;
+  top: 16%;
+  height: 420px;
+  width: 420px;
+  border-radius: 999px;
+  filter: blur(70px);
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.28), rgba(59, 130, 246, 0.03) 62%, transparent 78%);
+}
+
+.chip {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(14, 24, 46, 0.7);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+
+.glass-card {
+  border: 1px solid var(--surface-border);
+  background: linear-gradient(145deg, rgba(10, 16, 32, 0.86), rgba(10, 16, 32, 0.36));
+  backdrop-filter: blur(14px);
+  box-shadow: 0 18px 50px rgba(2, 6, 23, 0.45);
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out, border-color 200ms ease-out;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 25px 60px rgba(8, 47, 73, 0.3);
+}
+
+.btn-primary,
+.btn-secondary {
+  border-radius: 0.95rem;
+  padding: 0.8rem 1.3rem;
+  font-weight: 600;
+  transition: all 200ms ease-out;
+}
+
+.btn-primary {
+  background: linear-gradient(95deg, #ffffff 0%, #d7f7ff 42%, #7dd3fc 100%);
+  color: #020617;
+  box-shadow: 0 10px 28px rgba(56, 189, 248, 0.28);
+}
+
+.btn-primary:hover {
+  transform: scale(1.03);
+  box-shadow: 0 16px 36px rgba(34, 211, 238, 0.38);
+}
+
+.btn-secondary {
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-secondary:hover {
+  transform: scale(1.03);
+  border-color: rgba(226, 232, 240, 0.75);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.final-cta {
+  border: 1px solid rgba(186, 230, 253, 0.35);
+  background: linear-gradient(140deg, rgba(15, 23, 42, 0.8) 0%, rgba(15, 118, 110, 0.34) 55%, rgba(8, 47, 73, 0.72) 100%);
+  box-shadow: 0 30px 80px rgba(2, 132, 199, 0.22);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  opacity: 0;
+  animation: fade-up 680ms ease-out forwards;
 }
