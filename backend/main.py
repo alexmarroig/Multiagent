@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import signal
 
 from celery import Celery
@@ -24,9 +25,27 @@ logging.basicConfig(
 logger = logging.LoggerAdapter(logging.getLogger("agentos-backend"), {"app_env": settings.app_env})
 
 
+def get_runtime_port() -> int:
+    """Lê e valida a porta de execução a partir da variável de ambiente PORT."""
+    raw_port = os.getenv("PORT")
+    if raw_port is None or not raw_port.strip():
+        raise RuntimeError("PORT environment variable is required and must be a valid integer")
+
+    try:
+        port = int(raw_port)
+    except ValueError as exc:
+        raise RuntimeError("PORT environment variable must be a valid integer") from exc
+
+    if not (1 <= port <= 65535):
+        raise RuntimeError("PORT environment variable must be between 1 and 65535")
+
+    return port
+
+
 async def lifespan(_: FastAPI):
     settings.validate_runtime()
-    logger.info("startup pid=%s port=%s", current_pid(), settings.port)
+    runtime_port = get_runtime_port()
+    logger.info("startup pid=%s port=%s", current_pid(), runtime_port)
 
     def _handle_signal(signum, _frame):
         logger.info("shutdown_signal_received signal=%s", signum)
@@ -59,22 +78,16 @@ app.include_router(ws_router)
 
 
 @app.get("/health")
-async def health() -> dict[str, str | int]:
-    return {
-        "status": "ok",
-        "version": "0.4.1",
-        "env": settings.app_env,
-        "port": settings.port,
-    }
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 celery_app = Celery("agentos", broker=settings.redis_url, backend=settings.redis_url)
 
-import os
 import uvicorn
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = get_runtime_port()
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
