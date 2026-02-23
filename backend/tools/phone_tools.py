@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
-from crewai_tools import tool
 from twilio.rest import Client
 
 
-@tool("make_phone_call")
-def make_phone_call(to_number: str, script: str, language: str = "pt-BR") -> dict:
+def make_phone_call(to_number: str, script: str, language: str = "pt-BR") -> dict[str, Any]:
     """Realiza ligação com script via TwiML."""
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
