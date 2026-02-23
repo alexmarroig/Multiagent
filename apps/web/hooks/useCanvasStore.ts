@@ -11,13 +11,6 @@ import {
   type Node,
   type NodeChange,
 } from 'reactflow';
-import {
-  AGENT_TEMPLATES,
-  type AgentNodeData,
-  type AgentTemplate,
-  type NodeStatus,
-  type RunState,
-} from '@/types/agentos';
 import { AGENT_TEMPLATES, type AgentNodeData, type AgentTemplate, type NodeStatus, type RunState } from '@/types/agentos';
 import { supabase } from '@/lib/supabase/client';
 
@@ -49,14 +42,6 @@ type CanvasStore = {
   loadFlow: (flowId: string) => Promise<void>;
 };
 
-export const useCanvasStore = create<CanvasStore>((set, get) => ({
-  nodes: [],
-  edges: [],
-  selectedNodeId: null,
-  executionLogs: [
-    '[boot] AgentOS canvas inicializado.',
-    '[hint] Arraste agentes da sidebar para o canvas.',
-  ],
 const defaultNodes: Node<AgentNodeData>[] = [
   {
     id: 'node-supervisor',
@@ -69,6 +54,7 @@ const defaultNodes: Node<AgentNodeData>[] = [
       model: 'gpt-4.1',
       prompt: AGENT_TEMPLATES.find((t) => t.id === 'supervisor-agent')?.defaultPrompt ?? '',
       tools: ['langgraph', 'evaluation'],
+      status: 'idle',
     },
   },
 ];
@@ -76,8 +62,11 @@ const defaultNodes: Node<AgentNodeData>[] = [
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodes: defaultNodes,
   edges: [],
-  selectedNodeId: defaultNodes[0].id,
-  executionLogs: ['[boot] AgentOS canvas inicializado.'],
+  selectedNodeId: defaultNodes[0]?.id ?? null,
+  executionLogs: [
+    '[boot] AgentOS canvas inicializado.',
+    '[hint] Arraste agentes da sidebar para o canvas.',
+  ],
   sessionId: null,
   runState: 'idle',
   nodeStatuses: {},
@@ -126,44 +115,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   clearLogs: () => set({ executionLogs: ['[console] Logs limpos.'] }),
   setSessionId: (id) => set({ sessionId: id }),
   setRunState: (state) => set({ runState: state }),
-  setNodeStatus: (nodeId, status) => set((state) => ({ nodeStatuses: { ...state.nodeStatuses, [nodeId]: status } })),
+  setNodeStatus: (nodeId, status) =>
+    set((state) => ({ nodeStatuses: { ...state.nodeStatuses, [nodeId]: status } })),
   setLastResult: (result) => set({ lastResult: result }),
   setBackendOnline: (value) => set({ backendOnline: value }),
   resetRun: () => set({ sessionId: null, runState: 'idle', nodeStatuses: {}, lastResult: null }),
-
-  saveFlow: async (name, description = '') => {
-    const { nodes, edges } = get();
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-
-    const config = {
-      nodes: nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
-      edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
-    };
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/flows`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ name, description, config }),
-    });
-
-    return response.json();
-  },
-
-  loadFlow: async (flowId) => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData.session?.access_token;
-
-  resetRun: () =>
-    set(() => ({
-      sessionId: null,
-      runState: 'idle',
-      nodeStatuses: {},
-      lastResult: null,
-    })),
 
   saveFlow: async (name, description = '') => {
     const { nodes, edges } = get();
@@ -172,20 +128,12 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     } = await supabase.auth.getSession();
 
     const config = {
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        type: n.type,
-        position: n.position,
-        data: n.data,
-      })),
-      edges: edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-      })),
+      nodes: nodes.map((n) => ({ id: n.id, type: n.type, position: n.position, data: n.data })),
+      edges: edges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
     };
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/flows`, {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+    const response = await fetch(`${apiBase}/api/flows`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -202,31 +150,23 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       data: { session },
     } = await supabase.auth.getSession();
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/flows/${flowId}`, {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+    const response = await fetch(`${apiBase}/api/flows/${flowId}`, {
       headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
     });
 
     const flow = await response.json();
-
     set({
       nodes: flow.config?.nodes ?? [],
       edges: flow.config?.edges ?? [],
+      selectedNodeId: flow.config?.nodes?.[0]?.id ?? null,
     });
   },
 }));
 
-// Utilitário para mapear automaticamente templates por nome.
 export function findTemplateByAgentName(agentName: string): AgentTemplate | undefined {
   const normalized = agentName.toLowerCase();
   return AGENT_TEMPLATES.find((template) =>
     normalized.includes(template.name.toLowerCase().replace('agent', '')),
   );
 }
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/flows/${flowId}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-
-    const flow = await response.json();
-    set({ nodes: flow.config.nodes ?? [], edges: flow.config.edges ?? [] });
-  },
-}));

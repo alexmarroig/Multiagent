@@ -16,12 +16,14 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/auth-ui-react": "^0.4.7",
     "@supabase/auth-ui-shared": "^0.1.8",
-    "recharts": "^2.12.0",
+    "@supabase/supabase-js": "^2.45.0",
     "date-fns": "^3.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.0",
     "uuid": "^9.0.1"
   }
 }
