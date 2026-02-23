@@ -1,8 +1,5 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Agentic Dev Studio',
@@ -16,10 +13,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <div className="min-h-screen bg-gray-50 text-gray-900">
-          {children}
-        </div>
+      <body>
+        <div className="min-h-screen bg-gray-50 text-gray-900">{children}</div>
       </body>
     </html>
   );

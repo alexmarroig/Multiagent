@@ -11,6 +11,10 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "reactflow": "^11.11.4",
+    "styled-jsx": "^5.1.1",
     "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/react": "file:types/react-stub"
   }
 }
