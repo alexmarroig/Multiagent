@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import os
 
-from crewai_tools import tool
 from tavily import TavilyClient
 
 
-@tool("web_search")
 def web_search(query: str) -> str:
     """Busca avançada na web e retorna resposta com top resultados."""
     api_key = os.getenv("TAVILY_API_KEY")

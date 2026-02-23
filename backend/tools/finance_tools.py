@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import json
 
-from crewai_tools import tool
 import yfinance as yf
 
 
-@tool("get_stock_data")
 def get_stock_data(ticker: str, period: str = "1y") -> str:
     """Obtém dados de ações e retorna JSON com métricas e histórico."""
     try:

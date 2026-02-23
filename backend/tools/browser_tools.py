@@ -5,11 +5,10 @@ from __future__ import annotations
 import asyncio
 import json
 
-from crewai_tools import tool
 from playwright.async_api import async_playwright
 
 
-async def _browse(url: str) -> dict:
+async def _browse(url: str) -> dict[str, str]:
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         try:
@@ -22,7 +21,6 @@ async def _browse(url: str) -> dict:
             await browser.close()
 
 
-@tool("browse_website")
 def browse_website(url: str, task: str = "extrair conteúdo principal") -> str:
     """Navega em uma URL e retorna título e texto limitado."""
     try:
@@ -32,7 +30,6 @@ def browse_website(url: str, task: str = "extrair conteúdo principal") -> str:
         return json.dumps({"error": str(exc), "task": task}, ensure_ascii=False)
 
 
-@tool("search_hotels")
 def search_hotels(destination: str, checkin: str, checkout: str, guests: int = 2) -> str:
     """Retorna opções simuladas de hotéis (MVP)."""
     options = [
