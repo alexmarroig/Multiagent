@@ -13,13 +13,11 @@ const activity = [
 
 export default function DashboardPage() {
   return (
-    <div className="space-y-6 pb-2">
+    <div className="space-y-6">
       <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-lg transition-all duration-300 hover:border-neutral-700">
-        <p className="text-sm font-medium text-neutral-400">Painel institucional</p>
-        <h1 className="mt-2 max-w-4xl text-4xl font-semibold tracking-tight leading-tight text-pretty">
-          Visão consolidada da operação enterprise
-        </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-neutral-400 text-pretty">
+        <p className="text-sm text-neutral-400">Painel institucional</p>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight">Visão consolidada da operação enterprise</h1>
+        <p className="mt-3 max-w-3xl text-sm text-neutral-400">
           Monitoramento estratégico de receita, risco e performance em um cockpit compacto para times executivos.
         </p>
       </section>
@@ -30,9 +28,9 @@ export default function DashboardPage() {
             key={card.title}
             className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-lg transition-all duration-300 hover:border-neutral-700"
           >
-            <h2 className="text-lg font-medium leading-snug text-neutral-300 text-balance">{card.title}</h2>
-            <p className="mt-4 text-3xl font-bold tracking-tight">{card.value}</p>
-            <p className="mt-2 text-sm leading-6 text-neutral-400 text-pretty">{card.description}</p>
+            <h2 className="text-lg font-medium text-neutral-300">{card.title}</h2>
+            <p className="mt-4 text-3xl font-bold">{card.value}</p>
+            <p className="mt-2 text-sm text-neutral-400">{card.description}</p>
           </article>
         ))}
       </section>
@@ -40,13 +38,11 @@ export default function DashboardPage() {
       <section className="grid gap-6 md:grid-cols-3">
         <article className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-lg transition-all duration-300 hover:border-neutral-700 md:col-span-2">
           <div className="mb-5 flex items-start justify-between gap-4">
-            <div className="min-w-0">
+            <div>
               <h2 className="text-lg font-medium text-neutral-300">Performance financeira</h2>
-              <p className="mt-1 text-sm leading-6 text-neutral-400 text-pretty">Evolução semanal com base no consolidado multiunidade.</p>
+              <p className="mt-1 text-sm text-neutral-400">Evolução semanal com base no consolidado multiunidade.</p>
             </div>
-            <span className="whitespace-nowrap rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-xs font-medium text-neutral-400">
-              Últimos 90 dias
-            </span>
+            <span className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-xs text-neutral-400">Últimos 90 dias</span>
           </div>
 
           <div className="relative max-h-[320px] overflow-hidden rounded-xl border border-neutral-800 bg-[linear-gradient(to_right,rgba(64,64,64,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(64,64,64,0.18)_1px,transparent_1px)] bg-[size:30px_30px] p-4">
@@ -73,7 +69,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-medium text-neutral-300">Eventos e alertas</h2>
           <ul className="mt-4 space-y-3">
             {activity.map((item) => (
-              <li key={item} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm leading-6 text-neutral-400 text-pretty">
+              <li key={item} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-400">
                 {item}
               </li>
             ))}
