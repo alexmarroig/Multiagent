@@ -1,91 +1,93 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+
+const ease = [0.16, 1, 0.3, 1] as const;
 
 export default function LoginPage() {
+  const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
-  const router = useRouter();
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
     setLoading(true);
+    setError('');
+    setToast('');
+
     try {
       await signIn(email, password);
-      router.push('/agentos');
+      setToast('Login realizado com sucesso. Redirecionando...');
     } catch (err: any) {
-      setError(err.message || 'Erro ao fazer login');
+      setError(err?.message || 'Não foi possível autenticar sua conta.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="max-w-md w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-lg shadow-lg">
-        <div>
-          <h2 className="text-center text-3xl font-bold text-gray-900 dark:text-white">AgentOS</h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">Entre na sua conta</p>
-        </div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#05070d] px-4">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(59,130,246,0.2),transparent_40%),radial-gradient(circle_at_80%_75%,rgba(29,78,216,0.15),transparent_35%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background-image:radial-gradient(#fff_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
+      <div className="pointer-events-none absolute h-[300px] w-[300px] rounded-full bg-blue-500/20 blur-[95px]" />
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, ease }}
+        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl"
+      >
+        <h1 className="text-2xl font-semibold text-white">Infraestrutura de Inteligência Financeira</h1>
+        <p className="mt-2 text-sm text-gray-400">Acesse sua plataforma institucional.</p>
 
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="seu@email.com"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@empresa.com"
+            className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none transition-all duration-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/35"
+          />
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none transition-all duration-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/35"
+          />
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Senha</label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
+          {error && <p className="text-xs text-red-300">{error}</p>}
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            transition={{ duration: 0.4, ease }}
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 px-4 py-3 text-sm font-semibold text-white shadow-[0_0_32px_rgba(59,130,246,0.35)] disabled:opacity-60"
           >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-
-          <div className="text-center text-sm">
-            <span className="text-gray-600 dark:text-gray-400">Não tem conta? </span>
-            <Link href="/signup" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">
-              Criar conta
-            </Link>
-          </div>
+            {loading ? 'Autenticando...' : 'Entrar'}
+          </motion.button>
         </form>
-      </div>
-    </div>
+
+        <p className="mt-5 text-center text-sm text-gray-400">
+          Ainda não possui acesso?{' '}
+          <Link className="text-blue-300 hover:text-blue-200" href="/signup">
+            Solicitar conta
+          </Link>
+        </p>
+
+        {toast && (
+          <div className="mt-4 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-100">{toast}</div>
+        )}
+      </motion.section>
+    </main>
   );
 }
