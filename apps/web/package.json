@@ -7,15 +7,19 @@
     "start": "next start -p ${PORT:-3000}"
   },
   "dependencies": {
+    "date-fns": "^3.0.0",
+    "framer-motion": "^11.3.19",
     "next": "^14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "reactflow": "^11.11.4",
+    "recharts": "^2.12.0",
     "styled-jsx": "^5.1.1",
-    "zustand": "^4.5.4",
-    "framer-motion": "^11.3.19"
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
-    "@types/react": "file:types/react-stub"
+    "@types/node": "^20.14.12",
+    "@types/react": "file:types/react-stub",
+    "typescript": "^5.5.4"
   }
 }
