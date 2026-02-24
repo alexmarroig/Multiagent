@@ -1,80 +1,65 @@
-const metricCards = [
-  { title: 'Receita operacional', value: 'R$ 48,2M', description: 'Acumulado no trimestre com atualização diária.' },
-  { title: 'Margem institucional', value: '27,4%', description: 'Eficiência consolidada entre unidades estratégicas.' },
-  { title: 'Risco monitorado', value: '71/100', description: 'Cobertura de compliance e exposição em tempo real.' },
+'use client';
+
+import { motion } from 'framer-motion';
+
+const points = [
+  { x: 20, y: 180 },
+  { x: 90, y: 165 },
+  { x: 160, y: 138 },
+  { x: 230, y: 120 },
+  { x: 300, y: 98 },
+  { x: 370, y: 88 },
+  { x: 440, y: 70 },
+  { x: 510, y: 64 },
+  { x: 580, y: 52 },
 ];
 
-const activity = [
-  'Motor de risco atualizou 128 eventos críticos.',
-  '4 alçadas de aprovação concluídas nas últimas 2 horas.',
-  'Sincronização com provedores externos está estável.',
-  'Projeção de caixa recalculada para cenário defensivo.',
+const metrics = [
+  { label: 'Liquidez imediata', value: 'R$ 14,8M', detail: '+4,2% nas últimas 24h' },
+  { label: 'Exposição a risco', value: '13,4%', detail: '-1,1 p.p. vs. semana anterior' },
+  { label: 'Eficiência operacional', value: '92,7%', detail: '+2,3 p.p. em 30 dias' },
 ];
 
 export default function DashboardPage() {
+  const path = points.map((p, index) => `${index === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-lg transition-all duration-300 hover:border-neutral-700">
-        <p className="text-sm text-neutral-400">Painel institucional</p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight">Visão consolidada da operação enterprise</h1>
-        <p className="mt-3 max-w-3xl text-sm text-neutral-400">
-          Monitoramento estratégico de receita, risco e performance em um cockpit compacto para times executivos.
-        </p>
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
+        <p className="text-xs uppercase tracking-[0.2em] text-blue-200">Patrimônio consolidado</p>
+        <h1 className="mt-4 text-5xl font-semibold tracking-tight text-white">R$ 248,9M</h1>
+        <p className="mt-2 text-sm text-gray-400">Visão em tempo real da operação financeira institucional.</p>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-3">
-        {metricCards.map((card) => (
-          <article
-            key={card.title}
-            className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-lg transition-all duration-300 hover:border-neutral-700"
-          >
-            <h2 className="text-lg font-medium text-neutral-300">{card.title}</h2>
-            <p className="mt-4 text-3xl font-bold">{card.value}</p>
-            <p className="mt-2 text-sm text-neutral-400">{card.description}</p>
+      <section className="grid gap-5 md:grid-cols-3">
+        {metrics.map((metric) => (
+          <article key={metric.label} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <p className="text-sm text-gray-400">{metric.label}</p>
+            <p className="mt-3 text-3xl font-semibold text-white">{metric.value}</p>
+            <p className="mt-2 text-xs text-blue-200">{metric.detail}</p>
           </article>
         ))}
       </section>
 
-      <section className="grid gap-6 md:grid-cols-3">
-        <article className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-lg transition-all duration-300 hover:border-neutral-700 md:col-span-2">
-          <div className="mb-5 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-medium text-neutral-300">Performance financeira</h2>
-              <p className="mt-1 text-sm text-neutral-400">Evolução semanal com base no consolidado multiunidade.</p>
-            </div>
-            <span className="rounded-md border border-neutral-800 bg-neutral-950 px-2.5 py-1 text-xs text-neutral-400">Últimos 90 dias</span>
-          </div>
-
-          <div className="relative max-h-[320px] overflow-hidden rounded-xl border border-neutral-800 bg-[linear-gradient(to_right,rgba(64,64,64,0.18)_1px,transparent_1px),linear-gradient(to_bottom,rgba(64,64,64,0.18)_1px,transparent_1px)] bg-[size:30px_30px] p-4">
-            <svg viewBox="0 0 700 260" className="h-[300px] w-full" fill="none" aria-label="Gráfico de performance">
-              <path d="M30 210 L670 210" stroke="#404040" strokeWidth="1" />
-              <path
-                d="M30 170 C100 155, 130 120, 180 130 C230 140, 260 102, 320 110 C380 118, 430 78, 500 90 C560 102, 620 70, 670 82"
-                stroke="#60A5FA"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M30 185 C100 176, 130 162, 180 158 C230 154, 260 140, 320 145 C380 150, 430 124, 500 130 C560 136, 620 118, 670 122"
-                stroke="#93C5FD"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                opacity="0.85"
-              />
-            </svg>
-          </div>
-        </article>
-
-        <article className="rounded-xl border border-neutral-800 bg-neutral-900 p-6 shadow-lg transition-all duration-300 hover:border-neutral-700">
-          <h2 className="text-lg font-medium text-neutral-300">Eventos e alertas</h2>
-          <ul className="mt-4 space-y-3">
-            {activity.map((item) => (
-              <li key={item} className="rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-400">
-                {item}
-              </li>
-            ))}
-          </ul>
-        </article>
+      <section className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-medium text-white">Curva patrimonial</h2>
+          <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-gray-300">Atualização contínua</span>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-[#070b14] p-4">
+          <svg viewBox="0 0 600 220" className="h-[260px] w-full" fill="none">
+            <path d="M 20 200 L 580 200" stroke="rgba(148,163,184,0.25)" />
+            <motion.path
+              d={path}
+              stroke="#60a5fa"
+              strokeWidth="3"
+              strokeLinecap="round"
+              initial={{ pathLength: 0, opacity: 0.2 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            />
+          </svg>
+        </div>
       </section>
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/src/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
@@ -50,20 +50,11 @@ export function useAuth() {
 
   async function fetchProfile(userId: string) {
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
-      if (error) throw error;
       if (data) {
         setProfile(data as Profile);
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          localStorage.setItem('agentos_token', session.access_token);
-        }
       }
-    } catch (error) {
-      console.error('Erro ao buscar perfil:', error);
     } finally {
       setLoading(false);
     }
@@ -75,9 +66,9 @@ export function useAuth() {
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+
     if (error) throw error;
     return data;
   }
@@ -87,14 +78,14 @@ export function useAuth() {
       email,
       password,
     });
+
     if (error) throw error;
-    router.push('/agentos');
+    router.push('/dashboard');
     return data;
   }
 
   async function signOut() {
     await supabase.auth.signOut();
-    localStorage.removeItem('agentos_token');
     router.push('/login');
   }
 
