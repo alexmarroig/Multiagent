@@ -64,14 +64,15 @@ function FloatingDashboard() {
   return (
     <motion.div
       {...revealWithDelay(0.35)}
-      className="depth-2 relative rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl"
+      className="depth-2 relative overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-b from-white/10 via-white/5 to-white/[0.03] p-6 shadow-2xl"
       style={{ boxShadow: theme.shadows.depth3 }}
       animate={{ y: [0, -8, 0] }}
       transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
     >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.25),transparent_48%)]" />
       <div className="mb-5 flex items-center justify-between">
         <p className="text-xs uppercase tracking-[0.15em]" style={{ color: theme.colors.textTertiary }}>AgentOS Dashboard</p>
-        <span className="rounded-full border border-white/20 px-3 py-1 text-xs text-blue-200">Live</span>
+        <span className="rounded-full border border-emerald-300/35 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">● Live</span>
       </div>
       <div className="grid gap-4 md:grid-cols-5">
         <div className="rounded-2xl border border-white/10 bg-black/20 p-4 md:col-span-3">
@@ -144,6 +145,10 @@ export default function HomePage() {
 
       <section className="relative mx-auto grid min-h-[90vh] w-full max-w-6xl grid-cols-1 items-center gap-10 px-6 py-24 md:grid-cols-12 md:px-10">
         <div className="md:col-span-7">
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-500/10 px-4 py-1.5 text-xs font-medium text-blue-100">
+            <span className="inline-block h-2 w-2 rounded-full bg-blue-300 shadow-[0_0_10px_rgba(147,197,253,0.9)]" />
+            Plataforma institucional para gestão patrimonial
+          </div>
           <motion.p {...revealWithDelay(0.05)} className="mb-8 text-xs uppercase tracking-[0.2em] text-blue-200">AgentOS Enterprise Financial Intelligence</motion.p>
           <motion.h1
             {...revealWithDelay(0.15)}
@@ -152,20 +157,28 @@ export default function HomePage() {
           >
             Infraestrutura de inteligência financeira para operar com precisão institucional.
           </motion.h1>
-          <motion.p {...revealWithDelay(0.26)} className="mt-8 max-w-[600px] text-base leading-relaxed text-gray-400">
+          <motion.p {...revealWithDelay(0.26)} className="mt-8 max-w-[600px] text-lg leading-relaxed text-gray-300">
             Clareza operacional, visão de risco e execução assistida por IA em uma camada única de controle patrimonial.
           </motion.p>
+          <motion.div {...revealWithDelay(0.3)} className="mt-8 grid max-w-[640px] grid-cols-1 gap-3 sm:grid-cols-3">
+            {['Decisões com contexto', 'Monitoramento contínuo', 'Execução assistida por IA'].map((item) => (
+              <div key={item} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-200 backdrop-blur-sm">
+                {item}
+              </div>
+            ))}
+          </motion.div>
           <motion.div {...revealWithDelay(0.36)} className="mt-12 flex flex-wrap gap-4">
             <motion.div whileHover={{ scale: 1.04, boxShadow: theme.shadows.glow }} transition={{ duration: 0.45, ease: motionEase }}>
               <Link
                 href="/signup"
-                className="inline-flex rounded-[14px] border border-blue-400/30 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] px-7 py-3.5 text-sm font-semibold text-white"
+                className="inline-flex items-center gap-2 rounded-[14px] border border-blue-300/30 bg-gradient-to-r from-[#3B82F6] to-[#2563EB] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_10px_40px_rgba(37,99,235,0.45)]"
               >
                 Ativar AgentOS
+                <span aria-hidden>→</span>
               </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.04 }} transition={{ duration: 0.45, ease: motionEase }}>
-              <Link href="/login" className="inline-flex rounded-[14px] border border-white/15 bg-white/0 px-7 py-3.5 text-sm font-semibold text-white hover:bg-white/10">
+              <Link href="/login" className="inline-flex rounded-[14px] border border-white/20 bg-white/5 px-7 py-3.5 text-sm font-semibold text-white backdrop-blur-sm hover:bg-white/10">
                 Ver plataforma
               </Link>
             </motion.div>
