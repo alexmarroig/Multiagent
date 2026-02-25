@@ -7,10 +7,36 @@ import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const { signIn } = useAuth();
+  const [lang, setLang] = useState<'en' | 'pt'>('pt');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const t = {
+    en: {
+      title: 'Terminal_Access',
+      subtitle: 'SECURE_NEURAL_LINK_V4.0',
+      identity: 'IDENTITY_ID',
+      key: 'ACCESS_CRYPT_KEY',
+      button: 'INITIALIZE_SESSION',
+      loading: 'ESTABLISHING_LINK...',
+      request: '[ REQUEST_NEW_ACCESS_ID ]',
+      abort: '[ ABORT_AND_RETURN_HOME ]',
+      error: 'CRITICAL_ERROR'
+    },
+    pt: {
+      title: 'Acesso_ao_Terminal',
+      subtitle: 'LINK_NEURAL_SEGURO_V4.0',
+      identity: 'IDENTIDADE_ID',
+      key: 'CHAVE_DE_ACESSO_CRIPT',
+      button: 'INICIALIZAR_SESSÃO',
+      loading: 'ESTABELECENDO_LINK...',
+      request: '[ SOLICITAR_NOVO_ACESSO ]',
+      abort: '[ ABORTAR_E_VOLTAR_INICIO ]',
+      error: 'ERRO_CRITICO'
+    }
+  }[lang];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,11 +61,16 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-cyber-cyan/5 via-transparent to-transparent" />
       </div>
 
+      <div className="absolute top-6 right-6 z-30 flex bg-white/5 border border-white/10 p-0.5">
+        <button onClick={() => setLang('en')} className={`px-2 py-1 text-[9px] font-bold ${lang === 'en' ? 'bg-cyber-cyan text-black' : 'text-white/40'}`}>EN</button>
+        <button onClick={() => setLang('pt')} className={`px-2 py-1 text-[9px] font-bold ${lang === 'pt' ? 'bg-cyber-cyan text-black' : 'text-white/40'}`}>PT</button>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-md"
+        className="relative z-20 w-full max-w-md"
       >
         <div className="mb-12 text-center">
           <motion.div
@@ -50,10 +81,10 @@ export default function LoginPage() {
           >
             <span className="text-cyber-cyan text-2xl font-black">OS</span>
           </motion.div>
-          <h1 className="text-2xl font-black tracking-[0.4em] text-white uppercase italic">Terminal_Access</h1>
+          <h1 className="text-2xl font-black tracking-[0.4em] text-white uppercase italic">{t.title}</h1>
           <div className="mt-3 flex items-center justify-center gap-2">
             <div className="h-px w-8 bg-cyber-cyan/30" />
-            <p className="text-[10px] text-cyber-cyan/60 tracking-widest uppercase">SECURE_NEURAL_LINK_V4.0</p>
+            <p className="text-[10px] text-cyber-cyan/60 tracking-widest uppercase">{t.subtitle}</p>
             <div className="h-px w-8 bg-cyber-cyan/30" />
           </div>
         </div>
@@ -65,7 +96,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">IDENTITY_ID</label>
+              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t.identity}</label>
               <div className="relative group">
                 <input
                   type="text"
@@ -84,7 +115,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">ACCESS_CRYPT_KEY</label>
+              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">{t.key}</label>
               <div className="relative group">
                 <input
                   type="password"
@@ -108,24 +139,25 @@ export default function LoginPage() {
                 animate={{ opacity: 1, x: 0 }}
                 className="text-[10px] text-red-400 border-l-2 border-red-500 pl-3 py-2 bg-red-500/5 font-mono uppercase"
               >
-                CRITICAL_ERROR: {error}
+                {t.error}: {error}
               </motion.div>
             )}
 
             <button
+              type="submit"
               disabled={loading}
               className="btn-cyber-primary w-full py-5 text-sm font-black tracking-[0.3em]"
             >
-              {loading ? 'ESTABLISHING_LINK...' : 'INITIALIZE_SESSION'}
+              {loading ? t.loading : t.button}
             </button>
           </form>
 
           <div className="mt-10 flex flex-col gap-4 text-center">
             <Link className="text-[10px] font-bold text-neutral-500 hover:text-cyber-magenta transition-colors tracking-widest uppercase" href="/signup">
-              [ REQUEST_NEW_ACCESS_ID ]
+              {t.request}
             </Link>
             <Link className="text-[10px] font-bold text-neutral-700 hover:text-white transition-colors tracking-widest uppercase" href="/">
-              [ ABORT_AND_RETURN_HOME ]
+              {t.abort}
             </Link>
           </div>
         </div>

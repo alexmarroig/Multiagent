@@ -24,6 +24,8 @@ type CanvasStore = {
   nodeStatuses: Record<string, NodeStatus>;
   lastResult: string | null;
   backendOnline: boolean;
+  language: 'en' | 'pt';
+  setLanguage: (lang: 'en' | 'pt') => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -72,7 +74,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   nodeStatuses: {},
   lastResult: null,
   backendOnline: false,
+  language: 'pt',
 
+  setLanguage: (language) => set({ language }),
   onNodesChange: (changes) => set((state) => ({ nodes: applyNodeChanges(changes, state.nodes) })),
   onEdgesChange: (changes) => set((state) => ({ edges: applyEdgeChanges(changes, state.edges) })),
   onConnect: (connection) =>

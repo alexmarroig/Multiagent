@@ -5,14 +5,25 @@ import { motion } from 'framer-motion';
 import { AGENT_COLOR, AGENT_TEMPLATES, type AgentCategory } from '@/types/agentos';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 
-const CATEGORY_LABEL: Record<AgentCategory, string> = {
-  financial: 'FINANCEIRO',
-  marketing: 'MARKETING',
-  phone: 'VOIP_COMMS',
-  excel: 'DATA_TABLES',
-  travel: 'LOGISTICS',
-  supervisor: 'CORE_ORCHESTRATOR',
-  utility: 'SYSTEM_TOOLS',
+const CATEGORY_LABEL: Record<string, Record<AgentCategory, string>> = {
+  en: {
+    financial: 'FINANCIAL_CORE',
+    marketing: 'MARKETING_OPS',
+    phone: 'VOIP_COMMS',
+    excel: 'DATA_TABLES',
+    travel: 'LOGISTICS',
+    supervisor: 'CORE_ORCHESTRATOR',
+    utility: 'SYSTEM_TOOLS',
+  },
+  pt: {
+    financial: 'NUCLEO_FINANCEIRO',
+    marketing: 'MARKETING_OPS',
+    phone: 'COMUN_VOIP',
+    excel: 'TABELAS_DADOS',
+    travel: 'LOGISTICA',
+    supervisor: 'ORQUESTRADOR_CORE',
+    utility: 'FERRAMENTAS_SISTEMA',
+  }
 };
 
 const containerVariants = {
@@ -31,6 +42,7 @@ const itemVariants = {
 
 export default function AgentSidebar() {
   const addNodeFromTemplate = useCanvasStore((s) => s.addNodeFromTemplate);
+  const lang = useCanvasStore((s) => s.language);
 
   const grouped = useMemo(() => {
     const map = new Map<AgentCategory, typeof AGENT_TEMPLATES>();
@@ -54,10 +66,10 @@ export default function AgentSidebar() {
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <div className="h-4 w-1 bg-cyber-cyan shadow-[0_0_8px_#00f3ff]" />
-          <h2 className="text-sm font-black tracking-[0.2em] text-white uppercase">Neural_Library</h2>
+          <h2 className="text-sm font-black tracking-[0.2em] text-white uppercase">{lang === 'en' ? 'Neural_Library' : 'Biblioteca_Neural'}</h2>
         </div>
         <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">
-          Select_Protocol_to_Initialize
+          {lang === 'en' ? 'Select_Protocol_to_Initialize' : 'Selecione_Protocolo_para_Iniciar'}
         </p>
       </div>
 
@@ -70,8 +82,8 @@ export default function AgentSidebar() {
         {grouped.map(([category, templates]) => (
           <section key={category} className="space-y-3">
             <div className="flex items-center gap-3">
-              <p className="text-[10px] font-bold tracking-widest text-cyber-cyan/60 whitespace-nowrap">
-                {CATEGORY_LABEL[category]}
+              <p className="text-[10px] font-bold tracking-widest text-cyber-cyan/60 whitespace-nowrap uppercase">
+                {CATEGORY_LABEL[lang][category]}
               </p>
               <div className="h-px w-full bg-white/5" />
             </div>

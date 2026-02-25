@@ -33,6 +33,7 @@ function mapAgentNameToTemplate(agentName: string): AgentTemplate | null {
 export default function TemplateGallery({ onClose, onTemplateApplied }: TemplateGalleryProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const nodes = useCanvasStore((s) => s.nodes);
+  const lang = useCanvasStore((s) => s.language);
 
   useEffect(() => {
     fetchTemplates()
@@ -81,7 +82,8 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
   const source = templates.length ? templates : fallbackTemplates;
 
   const applyTemplate = (template: Template) => {
-    if (nodes.length > 0 && !window.confirm('Clear canvas and apply new protocol?')) {
+    const confirmMsg = lang === 'en' ? 'Clear canvas and apply new protocol?' : 'Limpar canvas e aplicar novo protocolo?';
+    if (nodes.length > 0 && !window.confirm(confirmMsg)) {
       return;
     }
 
@@ -129,12 +131,31 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
     onClose?.();
   };
 
+  const t = {
+    en: {
+      title: 'Neural_Protocols',
+      subtitle: 'Select_Deployment_Configuration',
+      dismiss: '[ DISMISS ]',
+      unsupported: 'UNSUPPORTED_AGENTS',
+      inputs: 'INPUT_VARS',
+      initialize: 'INITIALIZE'
+    },
+    pt: {
+      title: 'Protocolos_Neurais',
+      subtitle: 'Selecione_Configuracao_de_Implantacao',
+      dismiss: '[ DESCARTAR ]',
+      unsupported: 'AGENTES_NAO_SUPORTADOS',
+      inputs: 'VARIAVEIS_ENTRADA',
+      initialize: 'INICIALIZAR'
+    }
+  }[lang];
+
   return (
     <section className="glass-panel p-8 max-w-5xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
-           <h3 className="text-2xl font-black tracking-tighter text-white uppercase italic">Neural_Protocols</h3>
-           <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mt-1">Select_Deployment_Configuration</p>
+           <h3 className="text-2xl font-black tracking-tighter text-white uppercase italic">{t.title}</h3>
+           <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mt-1">{t.subtitle}</p>
         </div>
         {onClose && (
           <button
@@ -142,7 +163,7 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
             className="btn-cyber-outline !px-3 !py-1 !text-[10px]"
             onClick={onClose}
           >
-            [ DISMISS ]
+            {t.dismiss}
           </button>
         )}
       </div>
@@ -178,19 +199,19 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
 
               {isInvalid && (
                 <p className="mb-4 text-[9px] text-red-400 font-mono uppercase">
-                  UNSUPPORTED_AGENTS: ({invalidAgents.join(', ')})
+                  {t.unsupported}: ({invalidAgents.join(', ')})
                 </p>
               )}
 
               <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
-                <span className="text-[9px] text-neutral-600 font-mono uppercase">INPUT_VARS: {template.inputs.length}</span>
+                <span className="text-[9px] text-neutral-600 font-mono uppercase">{t.inputs}: {template.inputs.length}</span>
                 <button
                   type="button"
                   onClick={() => applyTemplate(template)}
                   disabled={isInvalid}
                   className="btn-cyber-primary !px-4 !py-1 !text-[10px]"
                 >
-                  INITIALIZE
+                  {t.initialize}
                 </button>
               </div>
             </motion.article>

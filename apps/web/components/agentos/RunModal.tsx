@@ -40,6 +40,7 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
   const [extraInputs, setExtraInputs] = useState<Record<string, string>>({});
   const setRunState = useCanvasStore((s) => s.setRunState);
   const resetRun = useCanvasStore((s) => s.resetRun);
+  const lang = useCanvasStore((s) => s.language);
 
   const agentsPresent = useMemo(() => {
     const labels = nodes.map((n) => n.data.label.toLowerCase());
@@ -100,6 +101,29 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
     }
   };
 
+  const t = {
+    en: {
+      title: 'Mission_Briefing',
+      ready: 'Ready_for_Deployment',
+      close: '[ CLOSE_TERMINAL ]',
+      warning: 'WARNING: UNMAPPED_TOOLS_DETECTED',
+      objective: 'PRIMARY_OBJECTIVE_SPECIFICATION',
+      placeholder: 'Ex: Analyze financial data and generate a report...',
+      abort: 'ABORT_MISSION',
+      initialize: 'INITIALIZE_DEPLOYMENT'
+    },
+    pt: {
+      title: 'Resumo_da_Missao',
+      ready: 'Pronto_para_Implantacao',
+      close: '[ FECHAR_TERMINAL ]',
+      warning: 'AVISO: FERRAMENTAS_NAO_MAPEADAS',
+      objective: 'ESPECIFICACAO_DO_OBJETIVO_PRIMARIO',
+      placeholder: 'Ex: Analisar dados financeiros e gerar um relatório...',
+      abort: 'ABORTAR_MISSAO',
+      initialize: 'INICIALIZAR_IMPLANTACAO'
+    }
+  }[lang];
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4">
       <motion.div
@@ -109,13 +133,13 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
       >
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h3 className="text-2xl font-black tracking-tighter text-white uppercase italic">Mission_Briefing</h3>
+            <h3 className="text-2xl font-black tracking-tighter text-white uppercase italic">{t.title}</h3>
             <p className="text-[10px] font-mono text-cyber-cyan/60 uppercase tracking-widest mt-1">
-              Ready_for_Deployment: {nodes.length} Agent(s)
+              {t.ready}: {nodes.length} {lang === 'en' ? 'Agent(s)' : 'Agente(s)'}
             </p>
           </div>
           <button onClick={onClose} className="text-neutral-500 hover:text-white transition-colors font-mono text-xs">
-            [ CLOSE_TERMINAL ]
+            {t.close}
           </button>
         </div>
 
@@ -126,7 +150,7 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
               animate={{ opacity: 1, x: 0 }}
               className="border-l-2 border-amber-500 bg-amber-500/5 p-4 text-[11px] text-amber-200 font-mono"
             >
-              <p className="font-bold mb-2">WARNING: UNMAPPED_TOOLS_DETECTED</p>
+              <p className="font-bold mb-2">{t.warning}</p>
               <ul className="space-y-1 opacity-80">
                 {toolNormalizationWarnings.map((warning) => (
                   <li key={warning.label}>
@@ -139,34 +163,42 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
 
           <div>
             <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-3">
-              PRIMARY_OBJECTIVE_SPECIFICATION
+              {t.objective}
             </label>
             <textarea
               value={objective}
               onChange={(event) => setObjective(event.target.value)}
               className="h-32 w-full border border-white/10 bg-white/5 p-4 text-xs text-white placeholder:text-neutral-700 outline-none focus:border-cyber-cyan transition-colors font-mono"
-              placeholder="Ex: Analyze financial data and generate a report..."
+              placeholder={t.placeholder}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {agentsPresent.travel && (
               <>
-                <input className="input-cyber" placeholder="destination" onChange={(e) => handleInputChange('destination', e.target.value)} />
-                <input className="input-cyber" placeholder="checkin (YYYY-MM-DD)" onChange={(e) => handleInputChange('checkin', e.target.value)} />
-                <input className="input-cyber" placeholder="checkout (YYYY-MM-DD)" onChange={(e) => handleInputChange('checkout', e.target.value)} />
-                <input className="input-cyber" placeholder="budget_brl" onChange={(e) => handleInputChange('budget_brl', e.target.value)} />
+                <input className="input-cyber" placeholder={lang === 'en' ? 'destination' : 'destino'} onChange={(e) => handleInputChange('destination', e.target.value)} />
+                <input className="input-cyber" placeholder={lang === 'en' ? 'checkin (YYYY-MM-DD)' : 'checkin (AAAA-MM-DD)'} onChange={(e) => handleInputChange('checkin', e.target.value)} />
+                <input className="input-cyber" placeholder={lang === 'en' ? 'checkout (YYYY-MM-DD)' : 'checkout (AAAA-MM-DD)'} onChange={(e) => handleInputChange('checkout', e.target.value)} />
+                <input className="input-cyber" placeholder={lang === 'en' ? 'budget_brl' : 'orcamento_brl'} onChange={(e) => handleInputChange('budget_brl', e.target.value)} />
               </>
             )}
 
             {agentsPresent.phone && (
-              <input className="input-cyber col-span-full" placeholder="phone_number" onChange={(e) => handleInputChange('phone_number', e.target.value)} />
+              <input className="input-cyber col-span-full" placeholder={lang === 'en' ? 'phone_number' : 'numero_telefone'} onChange={(e) => handleInputChange('phone_number', e.target.value)} />
             )}
 
             {agentsPresent.financial && (
               <>
-                <input className="input-cyber" placeholder="tickers (PETR4.SA,AAPL)" onChange={(e) => handleInputChange('tickers', e.target.value)} />
-                <input className="input-cyber" placeholder="period (1y)" onChange={(e) => handleInputChange('period', e.target.value)} />
+                <input className="input-cyber" placeholder={lang === 'en' ? 'tickers (PETR4.SA,AAPL)' : 'tickers (PETR4.SA,AAPL)'} onChange={(e) => handleInputChange('tickers', e.target.value)} />
+                <input className="input-cyber" placeholder={lang === 'en' ? 'period (1y)' : 'periodo (1y)'} onChange={(e) => handleInputChange('period', e.target.value)} />
+              </>
+            )}
+
+            {agentsPresent.marketing && (
+              <>
+                <input className="input-cyber" placeholder={lang === 'en' ? 'segment' : 'segmento'} onChange={(e) => handleInputChange('segment', e.target.value)} />
+                <input className="input-cyber" placeholder={lang === 'en' ? 'product' : 'produto'} onChange={(e) => handleInputChange('product', e.target.value)} />
+                <input className="input-cyber col-span-full" placeholder={lang === 'en' ? 'goal' : 'objetivo_marketing'} onChange={(e) => handleInputChange('goal', e.target.value)} />
               </>
             )}
           </div>
@@ -174,7 +206,7 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
 
         <div className="mt-10 flex justify-end gap-4">
           <button type="button" onClick={onClose} className="btn-cyber-outline !px-6 !py-2 !text-xs !border-white/10 text-white/50">
-            ABORT_MISSION
+            {t.abort}
           </button>
           <button
             type="button"
@@ -182,7 +214,7 @@ export default function RunModal({ nodes, edges, onClose, onRun }: RunModalProps
             onClick={handleSubmit}
             className="btn-cyber-primary !px-10 !py-2 !text-xs"
           >
-            INITIALIZE_DEPLOYMENT
+            {t.initialize}
           </button>
         </div>
       </motion.div>
