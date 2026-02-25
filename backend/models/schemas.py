@@ -33,6 +33,9 @@ class NodeConfig(BaseModel):
     provider: LLMProvider = LLMProvider.anthropic
     system_prompt: str = ""
     tools: list[str] = Field(default_factory=list)
+    task_timeout_seconds: int = 180
+    retry_max_attempts: int = 3
+    retry_base_delay_ms: int = 500
 
 
 class EdgeConfig(BaseModel):

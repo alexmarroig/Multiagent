@@ -7,15 +7,43 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from auth.dependencies import get_current_user
 from db.supabase_client import get_supabase
 from models.schemas import FlowConfig
-from orchestrator.crew_builder import execute_flow_graph
+from orchestrator.crew_builder import ExecutionCancelledError, build_crew_from_config
 from orchestrator.event_stream import make_event, publish_event
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
+TERMINAL_STATUSES = {"done", "error", "cancelled"}
+RUNNING_EXECUTIONS: dict[str, asyncio.Task[Any]] = {}
+CANCEL_FLAGS: dict[str, asyncio.Event] = {}
+
+
+def _current_status(supabase: Any, session_id: str) -> str | None:
+    response = (
+        supabase.table("executions").select("status").eq("session_id", session_id).limit(1).execute()
+    )
+    rows = response.data or []
+    if not rows:
+        return None
+    return rows[0].get("status")
+
+
+def _safe_update_execution(
+    supabase: Any,
+    session_id: str,
+    payload: dict[str, Any],
+    *,
+    terminal: bool = False,
+) -> None:
+    if terminal:
+        status = _current_status(supabase, session_id)
+        if status in TERMINAL_STATUSES:
+            return
+
+    supabase.table("executions").update(payload).eq("session_id", session_id).execute()
 
 
 async def execute_flow(flow: FlowConfig) -> None:
@@ -23,6 +51,8 @@ async def execute_flow(flow: FlowConfig) -> None:
     supabase = get_supabase()
     started = datetime.utcnow()
     event_log: list[dict[str, Any]] = []
+    cancel_event = CANCEL_FLAGS.setdefault(flow.session_id, asyncio.Event())
+    RUNNING_EXECUTIONS[flow.session_id] = asyncio.current_task()  # type: ignore[assignment]
 
     degraded_state = {"redis": False, "supabase": False}
 
@@ -34,6 +64,15 @@ async def execute_flow(flow: FlowConfig) -> None:
             degraded_state["redis"] = False
         except Exception:
             degraded_state["redis"] = True
+
+    def record_event(payload: dict[str, Any]) -> None:
+        event_log.append(payload)
+
+    def is_cancelled() -> bool:
+        if cancel_event.is_set():
+            return True
+        current = _current_status(supabase, flow.session_id)
+        return current in {"cancelling", "cancelled"}
 
     await emit(
         make_event(
@@ -59,11 +98,11 @@ async def execute_flow(flow: FlowConfig) -> None:
                 )
             )
 
-        def is_degraded() -> bool:
-            return degraded_state["redis"] or degraded_state["supabase"]
+        crew = build_crew_from_config(flow, event_recorder=record_event, cancellation_checker=is_cancelled)
+        result = await asyncio.to_thread(crew.kickoff, inputs=flow.inputs)
 
-        result_map = await execute_flow_graph(flow, health_check=is_degraded)
-        result = result_map.get("supervisor") or str(result_map)
+        if is_cancelled():
+            raise ExecutionCancelledError("Execução cancelada após kickoff.")
 
         for node in flow.nodes:
             label = getattr(node, "label", node.id)
@@ -97,24 +136,33 @@ async def execute_flow(flow: FlowConfig) -> None:
         )
 
         duration = int((datetime.utcnow() - started).total_seconds())
-        try:
-            (
-                supabase.table("executions")
-                .update(
-                    {
-                        "status": "done",
-                        "result": {"output": str(result)},
-                        "events": event_log,
-                        "completed_at": datetime.utcnow().isoformat(),
-                        "duration_seconds": duration,
-                    }
-                )
-                .eq("session_id", flow.session_id)
-                .execute()
-            )
-            degraded_state["supabase"] = False
-        except Exception:
-            degraded_state["supabase"] = True
+        _safe_update_execution(
+            supabase,
+            flow.session_id,
+            {
+                "status": "done",
+                "result": {"output": str(result)},
+                "events": event_log,
+                "completed_at": datetime.utcnow().isoformat(),
+                "duration_seconds": duration,
+            },
+            terminal=True,
+        )
+
+    except (asyncio.CancelledError, ExecutionCancelledError) as exc:
+        payload = {"reason": str(exc) or "Execução cancelada"}
+        await emit(make_event(flow.session_id, "system", "AgentOS", "cancelled", payload))
+        _safe_update_execution(
+            supabase,
+            flow.session_id,
+            {
+                "status": "cancelled",
+                "result": payload,
+                "events": event_log,
+                "completed_at": datetime.utcnow().isoformat(),
+            },
+            terminal=True,
+        )
 
     except Exception as exc:
         error_payload = {"error": str(exc), "trace": traceback.format_exc()}
@@ -129,29 +177,25 @@ async def execute_flow(flow: FlowConfig) -> None:
                 )
             )
 
-        try:
-            (
-                supabase.table("executions")
-                .update(
-                    {
-                        "status": "error",
-                        "result": error_payload,
-                        "events": event_log,
-                        "completed_at": datetime.utcnow().isoformat(),
-                    }
-                )
-                .eq("session_id", flow.session_id)
-                .execute()
-            )
-            degraded_state["supabase"] = False
-        except Exception:
-            degraded_state["supabase"] = True
+        _safe_update_execution(
+            supabase,
+            flow.session_id,
+            {
+                "status": "error",
+                "result": error_payload,
+                "events": event_log,
+                "completed_at": datetime.utcnow().isoformat(),
+            },
+            terminal=True,
+        )
+    finally:
+        RUNNING_EXECUTIONS.pop(flow.session_id, None)
+        CANCEL_FLAGS.pop(flow.session_id, None)
 
 
 @router.post("/run")
 async def run_flow(
     flow: FlowConfig,
-    background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
     session_id = flow.session_id or str(uuid.uuid4())
@@ -176,8 +220,46 @@ async def run_flow(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Falha ao criar execution: {exc}") from exc
 
-    background_tasks.add_task(execute_flow, flow)
+    CANCEL_FLAGS[session_id] = asyncio.Event()
+    task = asyncio.create_task(execute_flow(flow))
+    RUNNING_EXECUTIONS[session_id] = task
     return {"session_id": session_id, "status": "running"}
+
+
+@router.post("/{session_id}/cancel")
+async def cancel_flow(session_id: str, user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    supabase = get_supabase()
+    execution = (
+        supabase.table("executions")
+        .select("status,user_id")
+        .eq("session_id", session_id)
+        .limit(1)
+        .execute()
+    )
+    rows = execution.data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail="Execução não encontrada")
+    if rows[0].get("user_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+
+    status = rows[0].get("status")
+    if status in TERMINAL_STATUSES:
+        return {"session_id": session_id, "status": status, "message": "Execução já finalizada"}
+
+    _safe_update_execution(
+        supabase,
+        session_id,
+        {"status": "cancelling", "updated_at": datetime.utcnow().isoformat()},
+    )
+
+    cancel_event = CANCEL_FLAGS.setdefault(session_id, asyncio.Event())
+    cancel_event.set()
+
+    task = RUNNING_EXECUTIONS.get(session_id)
+    if task and not task.done():
+        task.cancel()
+
+    return {"session_id": session_id, "status": "cancelling"}
 
 
 @router.get("/templates")
