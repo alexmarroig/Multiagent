@@ -52,6 +52,7 @@ DEFAULT_PROMPTS: dict[AgentType, str] = {
 
 
 def _is_transient_error(message: str) -> bool:
+    """Verifica se o erro é temporário e pode ser retentado."""
     return any(hint in message.lower() for hint in TRANSIENT_ERROR_HINTS)
 
 
@@ -138,6 +139,7 @@ def _wrap_task_execution(
     event_recorder: Callable[[dict[str, Any]], None] | None,
     cancellation_checker: Callable[[], bool] | None,
 ) -> None:
+    """Encapsula a execução da task com retry logic e timeouts."""
     original = task.execute_sync
 
     def wrapped(*args: Any, **kwargs: Any) -> Any:
