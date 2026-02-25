@@ -694,7 +694,6 @@ async def execute_flow_graph(
     return outputs
 
 
-def build_crew_from_config(flow: FlowConfig) -> Crew:
 def build_crew_from_config(
     flow: FlowConfig,
     *,
@@ -742,7 +741,6 @@ def build_crew_from_config(
             llm=llm,
             verbose=True,
             allow_delegation=allow_delegation,
-            step_callback=_make_step_callback(session_id, user_id, node),
             step_callback=_make_step_callback(session_id, node, event_recorder),
         )
         agent_by_id[node.id] = agent
@@ -760,8 +758,6 @@ def build_crew_from_config(
             agent=agent,
             callback=_make_task_callback(session_id, node, event_recorder),
         )
-
-        _wrap_task_execution(task, session_id, user_id, node)
         _wrap_task_execution(
             task,
             session_id,
