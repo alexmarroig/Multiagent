@@ -20,15 +20,25 @@ def schedule_meeting(
 ) -> dict[str, Any]:
     """Cria evento no Google Calendar com link de reunião."""
     creds_path = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_JSON", "./credentials/google_calendar.json")
+    app_env = os.getenv("APP_ENV", "dev").lower()
     attendees = json.loads(attendees_json) if attendees_json else []
 
     if not os.path.exists(creds_path):
+        if app_env == "dev":
+            return {
+                "success": True,
+                "simulated": True,
+                "meet_link": "https://meet.google.com/simulated-link",
+                "event_link": "https://calendar.google.com/simulated-event",
+                "message": "Credenciais não encontradas. Agendamento simulado.",
+                "provider": "google_calendar",
+                "mode": "simulated",
+            }
         return {
-            "success": True,
-            "simulated": True,
-            "meet_link": "https://meet.google.com/simulated-link",
-            "event_link": "https://calendar.google.com/simulated-event",
-            "message": "Credenciais não encontradas. Agendamento simulado.",
+            "success": False,
+            "error": "Credenciais Google Calendar ausentes em ambiente de produção.",
+            "provider": "google_calendar",
+            "mode": "real",
         }
 
     try:
@@ -58,6 +68,17 @@ def schedule_meeting(
 
         entry_points = created.get("conferenceData", {}).get("entryPoints", [])
         meet_link = next((x.get("uri") for x in entry_points if x.get("entryPointType") == "video"), None)
-        return {"success": True, "meet_link": meet_link, "event_link": created.get("htmlLink")}
+        return {
+            "success": True,
+            "meet_link": meet_link,
+            "event_link": created.get("htmlLink"),
+            "provider": "google_calendar",
+            "mode": "real",
+        }
     except Exception as exc:
-        return {"success": False, "error": str(exc)}
+        return {
+            "success": False,
+            "error": str(exc),
+            "provider": "google_calendar",
+            "mode": "real",
+        }
