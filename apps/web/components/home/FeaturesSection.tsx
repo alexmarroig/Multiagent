@@ -1,58 +1,43 @@
-'use client';
-
 import { motion } from 'framer-motion';
 
-const cards = [
+const features = [
   {
-    title: 'Mercado',
-    description: 'Sinais macro e micro integrados ao processo decisório com baixa latência.',
-    accent: 'bg-primary',
+    title: 'Mercado em contexto',
+    text: 'Sinais de mercado com filtros institucionais para leitura de cenário em segundos.',
   },
   {
-    title: 'Risco',
-    description: 'Modelos de exposição e compliance com gatilhos de alerta e rastreabilidade.',
-    accent: 'bg-secondary',
+    title: 'Risco sob controle',
+    text: 'Alertas de drawdown, exposição e stress com priorização operacional.',
   },
   {
-    title: 'Patrimônio',
-    description: 'Visão consolidada de performance e objetivos para governança executiva.',
-    accent: 'bg-success',
+    title: 'Patrimônio em evolução',
+    text: 'Objetivos e performance conectados em um fluxo de decisão contínuo.',
   },
 ];
 
 export function FeaturesSection() {
   return (
-    <section className="py-16 border-t border-neutralDark-300">
-      <div className="max-w-7xl mx-auto px-6">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.45 }}
-          className="text-4xl md:text-5xl font-semibold tracking-tight text-neutral-100"
-        >
-          Camada única para mercado, risco e patrimônio
-        </motion.h2>
-        <p className="mt-4 text-lg font-medium text-neutral-300 max-w-3xl">
-          Um framework operacional para leitura integrada, respostas rápidas e decisões com padrão institucional.
-        </p>
+    <section className="mx-auto w-full max-w-7xl px-6 py-16">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.35 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+      >
+        <h2 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">Camada única para mercado, risco e patrimônio</h2>
+        <p className="mt-3 text-lg font-medium text-neutral-300">Uma arquitetura visual consistente para reduzir ruído e ampliar clareza.</p>
+      </motion.div>
 
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {cards.map((card, index) => (
-            <motion.article
-              key={card.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45, delay: index * 0.08 }}
-              className="rounded-xl border border-neutralDark-300 bg-neutralDark-200 p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.02] hover:border-primary"
-            >
-              <span className={`h-1.5 w-12 rounded-full ${card.accent} block`} />
-              <h3 className="mt-5 text-xl font-semibold text-neutral-100">{card.title}</h3>
-              <p className="mt-3 text-sm text-neutral-400">{card.description}</p>
-            </motion.article>
-          ))}
-        </div>
+      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+        {features.map((feature) => (
+          <article
+            key={feature.title}
+            className="rounded-xl border border-neutralDark-300 bg-neutralDark-200 p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.02] hover:border-primary"
+          >
+            <h3 className="text-xl font-semibold text-white">{feature.title}</h3>
+            <p className="mt-3 text-sm text-neutral-400">{feature.text}</p>
+          </article>
+        ))}
       </div>
     </section>
   );

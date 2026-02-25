@@ -20,10 +20,12 @@ export default function HomePage() {
     }
   }, [loading, router, user]);
 
-  if (loading) return null;
+  if (loading) {
+    return null;
+  }
 
   return (
-    <main className="min-h-screen bg-neutralDark-100 text-neutral-100">
+    <main className="min-h-screen bg-neutralDark-100 text-white">
       <TopBar />
       <HeroSection />
       <MetricsSection />

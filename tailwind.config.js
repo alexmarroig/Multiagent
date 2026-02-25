@@ -3,7 +3,7 @@ module.exports = {
   content: [
     './apps/web/app/**/*.{js,ts,jsx,tsx,mdx}',
     './apps/web/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './apps/web/hooks/**/*.{js,ts,jsx,tsx,mdx}',
+    './apps/web/src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
