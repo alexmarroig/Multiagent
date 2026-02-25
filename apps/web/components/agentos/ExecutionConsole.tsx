@@ -275,7 +275,8 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
                 </div>
               </motion.article>
             );
-          }))}
+          })
+          )}
         </AnimatePresence>
       </div>
     </motion.section>
