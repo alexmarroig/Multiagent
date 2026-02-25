@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import type { Edge, Node } from 'reactflow';
 import { AGENT_TEMPLATES, type AgentNodeData, type AgentTemplate } from '@/types/agentos';
 import { fetchTemplates, type Template } from '@/lib/api';
@@ -43,7 +44,7 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
     () => [
       {
         id: 'travel_agency',
-        name: 'Agência de Turismo',
+        name: 'PROTOCOL_VOYAGER',
         description: 'travel → financial → meeting',
         agents: ['travel', 'financial', 'meeting'],
         color: 'orange',
@@ -51,7 +52,7 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       },
       {
         id: 'marketing_company',
-        name: 'Empresa de Marketing',
+        name: 'PROTOCOL_GROWTH',
         description: 'marketing → financial → excel → phone',
         agents: ['marketing', 'financial', 'excel', 'phone'],
         color: 'blue',
@@ -59,7 +60,7 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       },
       {
         id: 'financial_office',
-        name: 'Escritório Financeiro',
+        name: 'PROTOCOL_WEALTH',
         description: 'financial → excel → supervisor',
         agents: ['financial', 'excel', 'supervisor'],
         color: 'green',
@@ -67,7 +68,7 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       },
       {
         id: 'executive_assistant',
-        name: 'Assistente Executivo',
+        name: 'PROTOCOL_COMMAND',
         description: 'meeting → phone → calendar → supervisor',
         agents: ['meeting', 'phone', 'calendar', 'supervisor'],
         color: 'purple',
@@ -80,7 +81,7 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
   const source = templates.length ? templates : fallbackTemplates;
 
   const applyTemplate = (template: Template) => {
-    if (nodes.length > 0 && !window.confirm('Limpar canvas atual e aplicar template?')) {
+    if (nodes.length > 0 && !window.confirm('Clear canvas and apply new protocol?')) {
       return;
     }
 
@@ -95,14 +96,14 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
         id: `tpl-${template.id}-${index}`,
         type: 'agentNode',
         position: {
-          x: 120 + (index % 3) * 250,
-          y: 120 + Math.floor(index / 3) * 180,
+          x: 120 + (index % 3) * 280,
+          y: 120 + Math.floor(index / 3) * 250,
         },
         data: {
           label: agent.name,
           category: agent.category,
           description: agent.description,
-          model: 'gpt-4.1-mini',
+          model: 'gpt-4o-mini',
           prompt: agent.defaultPrompt,
           tools: agent.defaultTools,
           status: 'idle',
@@ -115,7 +116,7 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
       source: generatedNodes[index].id,
       target: node.id,
       animated: true,
-      style: { strokeWidth: 2 },
+      style: { stroke: 'rgba(0, 243, 255, 0.4)', strokeWidth: 1.5 },
     }));
 
     useCanvasStore.setState({
@@ -129,57 +130,70 @@ export default function TemplateGallery({ onClose, onTemplateApplied }: Template
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold">Marketplace de Templates</h3>
+    <section className="glass-panel p-8 max-w-5xl mx-auto">
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+           <h3 className="text-2xl font-black tracking-tighter text-white uppercase italic">Neural_Protocols</h3>
+           <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mt-1">Select_Deployment_Configuration</p>
+        </div>
         {onClose && (
           <button
             type="button"
-            className="rounded border border-slate-300 px-3 py-1 text-sm dark:border-slate-600"
+            className="btn-cyber-outline !px-3 !py-1 !text-[10px]"
             onClick={onClose}
           >
-            Fechar
+            [ DISMISS ]
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
         {source.map((template) => {
           const invalidAgents = template.agents.filter((agent) => !mapAgentNameToTemplate(agent));
           const isInvalid = invalidAgents.length > 0;
 
           return (
-            <article key={template.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-700">
-              <p className="text-2xl">
-                {template.color === 'orange' ? '🟠' : template.color === 'blue' ? '🔵' : template.color === 'green' ? '🟢' : '🟣'}
-              </p>
-              <h4 className="mt-2 text-base font-bold">{template.name}</h4>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{template.description}</p>
-              <div className="mt-3 flex flex-wrap gap-1">
+            <motion.article
+              key={template.id}
+              whileHover={{ scale: 1.01, backgroundColor: 'rgba(255,255,255,0.03)' }}
+              className="border border-white/5 bg-white/[0.01] p-6 transition-all group"
+            >
+              <div className="flex justify-between items-start mb-4">
+                 <h4 className="text-lg font-black text-white tracking-tight italic group-hover:text-cyber-cyan transition-colors">{template.name}</h4>
+                 <div className="h-1 w-8 bg-white/10" />
+              </div>
+
+              <p className="text-[11px] text-neutral-500 font-mono mb-4">{template.description}</p>
+
+              <div className="flex flex-wrap gap-2 mb-6">
                 {template.agents.map((agent) => (
                   <span
                     key={`${template.id}-${agent}`}
-                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase dark:bg-slate-800"
+                    className="border border-white/10 bg-white/5 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-neutral-400"
                   >
                     {agent}
                   </span>
                 ))}
               </div>
+
               {isInvalid && (
-                <p className="mt-2 text-xs text-red-400">
-                  Template inválido: agentes não suportados ({invalidAgents.join(', ')})
+                <p className="mb-4 text-[9px] text-red-400 font-mono uppercase">
+                  UNSUPPORTED_AGENTS: ({invalidAgents.join(', ')})
                 </p>
               )}
-              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Inputs: {template.inputs.join(', ')}</p>
-              <button
-                type="button"
-                onClick={() => applyTemplate(template)}
-                disabled={isInvalid}
-                className="mt-3 rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Usar Template
-              </button>
-            </article>
+
+              <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
+                <span className="text-[9px] text-neutral-600 font-mono uppercase">INPUT_VARS: {template.inputs.length}</span>
+                <button
+                  type="button"
+                  onClick={() => applyTemplate(template)}
+                  disabled={isInvalid}
+                  className="btn-cyber-primary !px-4 !py-1 !text-[10px]"
+                >
+                  INITIALIZE
+                </button>
+              </div>
+            </motion.article>
           );
         })}
       </div>

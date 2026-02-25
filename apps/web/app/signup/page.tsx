@@ -5,103 +5,127 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 
-const ease = [0.16, 1, 0.3, 1] as const;
-
 export default function SignupPage() {
   const { signUp } = useAuth();
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) {
-      setError('A senha deve conter ao menos 6 caracteres.');
-      return;
-    }
-
     setLoading(true);
     setError('');
-    setToast('');
 
     try {
       await signUp(email, password, fullName);
-      setToast('Conta criada. Verifique seu e-mail para confirmação.');
     } catch (err: any) {
-      setError(err?.message || 'Não foi possível concluir o cadastro.');
+      setError(err?.message || 'REGISTRATION_FAILED: System overload or invalid parameters.');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#05070d] px-4">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_15%,rgba(59,130,246,0.2),transparent_40%),radial-gradient(circle_at_80%_75%,rgba(29,78,216,0.15),transparent_35%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background-image:radial-gradient(#fff_0.5px,transparent_0.5px)] [background-size:3px_3px]" />
-      <div className="pointer-events-none absolute h-[300px] w-[300px] rounded-full bg-blue-500/20 blur-[95px]" />
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black px-4 font-mono">
+      {/* Background HUD Layer */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div className="cyber-grid absolute inset-0 opacity-10" />
+        <div className="scanline absolute inset-0 opacity-20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-cyber-magenta/5 via-transparent to-transparent" />
+      </div>
 
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7, ease }}
-        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl"
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-md"
       >
-        <h1 className="text-2xl font-semibold text-white">Infraestrutura de Inteligência Financeira</h1>
-        <p className="mt-2 text-sm text-gray-400">Acesse sua plataforma institucional.</p>
-
-        <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-          <input
-            type="text"
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Nome completo"
-            className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none transition-all duration-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/35"
-          />
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@empresa.com"
-            className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none transition-all duration-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/35"
-          />
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-gray-500 outline-none transition-all duration-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/35"
-          />
-
-          {error && <p className="text-xs text-red-300">{error}</p>}
-
-          <motion.button
-            whileHover={{ scale: 1.04 }}
-            transition={{ duration: 0.4, ease }}
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 px-4 py-3 text-sm font-semibold text-white shadow-[0_0_32px_rgba(59,130,246,0.35)] disabled:opacity-60"
+        <div className="mb-12 text-center">
+          <motion.div
+            initial={{ rotate: 90, opacity: 0 }}
+            animate={{ rotate: 0, opacity: 1 }}
+            transition={{ delay: 0.3, duration: 1 }}
+            className="inline-block border-2 border-cyber-magenta p-3 mb-6 shadow-[0_0_15px_#ff00ff]"
           >
-            {loading ? 'Provisionando conta...' : 'Criar conta'}
-          </motion.button>
-        </form>
+            <span className="text-cyber-magenta text-2xl font-black">OS</span>
+          </motion.div>
+          <h1 className="text-2xl font-black tracking-[0.4em] text-white uppercase italic">Agent_Registration</h1>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <div className="h-px w-8 bg-cyber-magenta/30" />
+            <p className="text-[10px] text-cyber-magenta/60 tracking-widest uppercase">PROTOCOL_ENROLLMENT_ACTIVE</p>
+            <div className="h-px w-8 bg-cyber-magenta/30" />
+          </div>
+        </div>
 
-        <p className="mt-5 text-center text-sm text-gray-400">
-          Já possui acesso?{' '}
-          <Link className="text-blue-300 hover:text-blue-200" href="/login">
-            Entrar
-          </Link>
-        </p>
+        <div className="glass-panel-elevated p-8 md:p-10 border-white/10 relative">
+          {/* Decorative corner accents */}
+          <div className="absolute top-0 left-0 h-4 w-4 border-t border-l border-cyber-magenta" />
+          <div className="absolute bottom-0 right-0 h-4 w-4 border-b border-r border-cyber-magenta" />
 
-        {toast && (
-          <div className="mt-4 rounded-lg border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-100">{toast}</div>
-        )}
-      </motion.section>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">DESIGNATION_FULL_NAME</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Agent Name"
+                className="w-full border-b border-white/10 bg-transparent px-0 py-3 text-sm text-white placeholder:text-neutral-800 outline-none focus:border-cyber-magenta transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">IDENTITY_ID_EMAIL</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="agent@neural.link"
+                className="w-full border-b border-white/10 bg-transparent px-0 py-3 text-sm text-white placeholder:text-neutral-800 outline-none focus:border-cyber-magenta transition-colors"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-neutral-500 uppercase tracking-[0.2em]">NEW_CRYPT_KEY</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full border-b border-white/10 bg-transparent px-0 py-3 text-sm text-white placeholder:text-neutral-800 outline-none focus:border-cyber-magenta transition-colors"
+              />
+            </div>
+
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-[10px] text-red-400 border-l-2 border-red-500 pl-3 py-2 bg-red-500/5 font-mono uppercase"
+              >
+                SYSTEM_FAIL: {error}
+              </motion.div>
+            )}
+
+            <button
+              disabled={loading}
+              className="btn-cyber-outline !border-cyber-magenta !text-cyber-magenta hover:!bg-cyber-magenta/10 w-full py-5 text-sm font-black tracking-[0.3em]"
+            >
+              {loading ? 'GENERATING_IDENTIFIER...' : 'CREATE_PROTOCOL_LINK'}
+            </button>
+          </form>
+
+          <div className="mt-8 text-center">
+            <Link className="text-[10px] font-bold text-neutral-500 hover:text-cyber-cyan transition-colors tracking-widest uppercase" href="/login">
+              [ ALREADY_HAVE_ID? LOGIN_TERMINAL ]
+            </Link>
+          </div>
+        </div>
+      </motion.div>
     </main>
   );
 }

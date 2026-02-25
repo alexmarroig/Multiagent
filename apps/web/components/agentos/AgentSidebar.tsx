@@ -1,17 +1,32 @@
 'use client';
 
 import { useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { AGENT_COLOR, AGENT_TEMPLATES, type AgentCategory } from '@/types/agentos';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 
 const CATEGORY_LABEL: Record<AgentCategory, string> = {
-  financial: 'Financeiro',
-  marketing: 'Marketing',
-  phone: 'Telefone',
-  excel: 'Excel',
-  travel: 'Turismo',
-  supervisor: 'Supervisor',
-  utility: 'Utilitários',
+  financial: 'FINANCEIRO',
+  marketing: 'MARKETING',
+  phone: 'VOIP_COMMS',
+  excel: 'DATA_TABLES',
+  travel: 'LOGISTICS',
+  supervisor: 'CORE_ORCHESTRATOR',
+  utility: 'SYSTEM_TOOLS',
+};
+
+const containerVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { staggerChildren: 0.05, delayChildren: 0.2 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, x: -10 },
+  visible: { opacity: 1, x: 0 }
 };
 
 export default function AgentSidebar() {
@@ -30,40 +45,66 @@ export default function AgentSidebar() {
   }, []);
 
   return (
-    <aside className="h-full w-80 border-r border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-1 text-lg font-bold text-slate-900 dark:text-slate-100">Biblioteca de Agentes</h2>
-      <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-        Clique em um agente para adicionar no canvas.
-      </p>
+    <motion.aside
+      initial={{ x: -320 }}
+      animate={{ x: 0 }}
+      transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+      className="h-full w-80 border-r border-white/10 bg-black/40 backdrop-blur-xl p-4 flex flex-col"
+    >
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-4 w-1 bg-cyber-cyan shadow-[0_0_8px_#00f3ff]" />
+          <h2 className="text-sm font-black tracking-[0.2em] text-white uppercase">Neural_Library</h2>
+        </div>
+        <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">
+          Select_Protocol_to_Initialize
+        </p>
+      </div>
 
-      <div className="space-y-4 overflow-auto pr-1">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar"
+      >
         {grouped.map(([category, templates]) => (
-          <section key={category} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {CATEGORY_LABEL[category]}
-            </p>
+          <section key={category} className="space-y-3">
+            <div className="flex items-center gap-3">
+              <p className="text-[10px] font-bold tracking-widest text-cyber-cyan/60 whitespace-nowrap">
+                {CATEGORY_LABEL[category]}
+              </p>
+              <div className="h-px w-full bg-white/5" />
+            </div>
             {templates.map((template) => (
-              <button
+              <motion.button
                 key={template.id}
-                type="button"
+                variants={itemVariants}
+                whileHover={{ x: 5, backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(0, 243, 255, 0.3)' }}
+                whileTap={{ scale: 0.95, x: 10 }}
                 onClick={() => addNodeFromTemplate(template)}
-                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-800"
+                className="group w-full border border-white/5 bg-white/[0.02] p-4 text-left transition-all hover:border-cyber-cyan/30"
               >
-                <div className="mb-1 flex items-center gap-2">
-                  <span
-                    className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: AGENT_COLOR[template.category] }}
-                  />
-                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-bold text-white group-hover:text-cyber-cyan transition-colors">
                     {template.name}
                   </p>
+                  <span
+                    className="h-1.5 w-1.5 rounded-full animate-pulse shadow-[0_0_5px_currentColor]"
+                    style={{ color: AGENT_COLOR[template.category], backgroundColor: 'currentColor' }}
+                  />
                 </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300">{template.description}</p>
-              </button>
+                <p className="text-[10px] font-mono leading-relaxed text-neutral-500 group-hover:text-neutral-300">
+                  {template.description}
+                </p>
+              </motion.button>
             ))}
           </section>
         ))}
+      </motion.div>
+
+      <div className="mt-4 pt-4 border-t border-white/5 font-mono text-[8px] text-neutral-700">
+        SYSTEM_CAPACITY: 84% // NODES_ACTIVE: {AGENT_TEMPLATES.length}
       </div>
-    </aside>
+    </motion.aside>
   );
 }

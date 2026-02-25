@@ -51,7 +51,7 @@ const defaultNodes: Node<AgentNodeData>[] = [
       label: 'SupervisorAgent',
       category: 'supervisor',
       description: 'Coordena a execução dos agentes do fluxo.',
-      model: 'gpt-4.1',
+      model: 'gpt-4o-mini',
       prompt: AGENT_TEMPLATES.find((t) => t.id === 'supervisor-agent')?.defaultPrompt ?? '',
       tools: ['langgraph', 'evaluation'],
       status: 'idle',
@@ -64,8 +64,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   edges: [],
   selectedNodeId: defaultNodes[0]?.id ?? null,
   executionLogs: [
-    '[boot] AgentOS canvas inicializado.',
-    '[hint] Arraste agentes da sidebar para o canvas.',
+    '[BOOT] AGENT_OS_CANVAS_INITIALIZED',
+    '[HINT] DRAG_PROTOCOLS_FROM_SIDEBAR_TO_START',
   ],
   sessionId: null,
   runState: 'idle',
@@ -77,7 +77,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   onEdgesChange: (changes) => set((state) => ({ edges: applyEdgeChanges(changes, state.edges) })),
   onConnect: (connection) =>
     set((state) => ({
-      edges: addEdge({ ...connection, animated: true, style: { strokeWidth: 2 } }, state.edges),
+      edges: addEdge({
+        ...connection,
+        animated: true,
+        style: { stroke: 'rgba(0, 243, 255, 0.4)', strokeWidth: 1.5 }
+      }, state.edges),
     })),
 
   addNodeFromTemplate: (template) =>
@@ -95,7 +99,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
               label: template.name,
               category: template.category,
               description: template.description,
-              model: 'gpt-4.1-mini',
+              model: 'gpt-4o-mini',
               prompt: template.defaultPrompt,
               tools: template.defaultTools,
               status: 'idle',
@@ -112,7 +116,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       nodes: state.nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...data } } : node)),
     })),
   appendLog: (line) => set((state) => ({ executionLogs: [...state.executionLogs, line] })),
-  clearLogs: () => set({ executionLogs: ['[console] Logs limpos.'] }),
+  clearLogs: () => set({ executionLogs: ['[SYSTEM] LOGS_CLEARED'] }),
   setSessionId: (id) => set({ sessionId: id }),
   setRunState: (state) => set({ runState: state }),
   setNodeStatus: (nodeId, status) =>

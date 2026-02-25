@@ -2,6 +2,7 @@
 
 import 'reactflow/dist/style.css';
 import { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import ReactFlow, { Background, Controls, MiniMap, type ReactFlowInstance } from 'reactflow';
 import AgentNode from '@/components/agentos/AgentNode';
 import ExecutionConsole from '@/components/agentos/ExecutionConsole';
@@ -82,35 +83,49 @@ export default function AgentCanvas() {
     [nodes, nodeStatuses],
   );
 
-  const runButtonText = runState === 'running' ? 'Executando...' : runState === 'done' ? 'Executar novamente' : 'Run';
-  const runButtonClass =
-    runState === 'running'
-      ? 'animate-pulse bg-amber-500'
-      : runState === 'done'
-        ? 'bg-emerald-700'
-        : 'bg-emerald-600';
+  const runButtonText = runState === 'running' ? 'INITIALIZING...' : runState === 'done' ? 'RE_INITIALIZE' : 'RUN_MISSION';
 
   return (
-    <main className="relative flex h-full w-full flex-col bg-slate-100 dark:bg-slate-950">
-      <div className="absolute right-3 top-3 z-10 flex gap-2">
-        <button
+    <main className="relative flex h-full w-full flex-col bg-black overflow-hidden">
+      {/* HUD Controls */}
+      <div className="absolute right-6 top-6 z-10 flex gap-3">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           type="button"
           onClick={() => setShowTemplates(true)}
-          className="rounded bg-slate-700 px-3 py-1.5 text-sm font-semibold text-white"
+          className="btn-cyber-outline !px-4 !py-2 !text-xs !border-white/20 !text-white/70"
         >
-          Templates
-        </button>
-        <button
+          MISSION_TEMPLATES
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           type="button"
           onClick={() => setShowRunModal(true)}
           disabled={nodes.length === 0 || runState === 'running'}
-          className={`rounded px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 ${runButtonClass}`}
+          className={`btn-cyber-primary !px-6 !py-2 !text-xs ${
+            runState === 'running' ? 'animate-pulse !bg-amber-500 !text-black' :
+            runState === 'done' ? '!bg-cyber-magenta !text-white' : ''
+          }`}
         >
           {runButtonText}
-        </button>
+        </motion.button>
       </div>
 
-      <div className="min-h-0 flex-1">
+      <div className="absolute left-6 top-6 z-10 pointer-events-none">
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-1">
+            <div className="h-0.5 w-8 bg-cyber-cyan shadow-[0_0_5px_#00f3ff]" />
+            <div className="h-0.5 w-4 bg-cyber-cyan/50" />
+          </div>
+          <span className="font-mono text-[10px] tracking-[0.3em] text-cyber-cyan/60 uppercase">
+            ORCHESTRATION_CANVAS_V4
+          </span>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 relative">
         <ReactFlow
           nodes={flowNodes}
           edges={edges}
@@ -122,47 +137,61 @@ export default function AgentCanvas() {
           onConnect={onConnect}
           onNodeClick={(_, node) => selectNode(node.id)}
           onPaneClick={() => selectNode(null)}
+          colorMode="dark"
         >
           <MiniMap
             zoomable
             pannable
-            style={{ background: 'transparent' }}
-            maskColor="rgba(15, 23, 42, 0.15)"
+            nodeColor="#00f3ff"
+            nodeStrokeWidth={3}
           />
-          <Controls className="!shadow-md" />
-          <Background gap={20} size={1} className="!bg-slate-100 dark:!bg-slate-950" />
+          <Controls className="!bg-black/50 !border-white/10 !fill-white" />
+          <Background gap={40} size={1} color="rgba(0, 243, 255, 0.05)" />
         </ReactFlow>
+
+        <div className="absolute inset-0 pointer-events-none border-[1px] border-white/5 m-4" />
       </div>
 
       <ExecutionConsole events={events} isConnected={isConnected} isDone={isDone} error={error} />
 
-      {showRunModal && (
-        <RunModal
-          nodes={nodes}
-          edges={edges}
-          onClose={() => setShowRunModal(false)}
-          onRun={(newSessionId) => {
-            setSessionId(newSessionId);
-            setRunState('running');
-            setShowRunModal(false);
-          }}
-        />
-      )}
-
-      {showTemplates && (
-        <div className="absolute inset-0 z-20 overflow-auto bg-black/40 p-4">
-          <TemplateGallery
-            onClose={() => setShowTemplates(false)}
-            onTemplateApplied={() => {
-              setShowTemplates(false);
-              setShowRunModal(true);
-              setTimeout(() => {
-                rfInstance?.fitView({ padding: 0.2, duration: 600 });
-              }, 80);
+      <AnimatePresence>
+        {showRunModal && (
+          <RunModal
+            nodes={nodes}
+            edges={edges}
+            onClose={() => setShowRunModal(false)}
+            onRun={(newSessionId) => {
+              setSessionId(newSessionId);
+              setRunState('running');
+              setShowRunModal(false);
             }}
           />
-        </div>
-      )}
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showTemplates && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-20 overflow-auto bg-black/80 backdrop-blur-sm p-4 flex items-center justify-center"
+          >
+            <div className="w-full max-w-5xl">
+              <TemplateGallery
+                onClose={() => setShowTemplates(false)}
+                onTemplateApplied={() => {
+                  setShowTemplates(false);
+                  setShowRunModal(true);
+                  setTimeout(() => {
+                    rfInstance?.fitView({ padding: 0.2, duration: 600 });
+                  }, 80);
+                }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
