@@ -11,6 +11,7 @@ export default function AgentConfig() {
   const nodes = useCanvasStore((s) => s.nodes);
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
+  const lang = useCanvasStore((s) => s.language);
 
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId),
@@ -35,9 +36,11 @@ export default function AgentConfig() {
             <div className="h-12 w-12 border border-dashed border-white/20 rounded-full flex items-center justify-center mb-4">
               <div className="h-2 w-2 bg-white/20 rounded-full animate-pulse" />
             </div>
-            <h2 className="text-xs font-black tracking-widest text-white/40 uppercase mb-2">AWAITING_SELECTION</h2>
+            <h2 className="text-xs font-black tracking-widest text-white/40 uppercase mb-2">
+               {lang === 'en' ? 'AWAITING_SELECTION' : 'AGUARDANDO_SELEÇÃO'}
+            </h2>
             <p className="text-[10px] font-mono text-neutral-600 leading-relaxed uppercase">
-              Click_on_a_node_to_access_core_parameters
+              {lang === 'en' ? 'Click_on_a_node_to_access_core_parameters' : 'Clique_em_um_nó_para_acessar_parâmetros'}
             </p>
           </motion.div>
         ) : (
@@ -59,7 +62,9 @@ export default function AgentConfig() {
 
             <div className="space-y-4">
               <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">DESIGNATION</span>
+                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                   {lang === 'en' ? 'DESIGNATION' : 'DESIGNAÇÃO'}
+                </span>
                 <input
                   className={inputClassName}
                   value={selectedNode.data.label}
@@ -68,7 +73,9 @@ export default function AgentConfig() {
               </label>
 
               <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">CORE_ENGINE</span>
+                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                   {lang === 'en' ? 'CORE_ENGINE' : 'MOTOR_PRINCIPAL'}
+                </span>
                 <input
                   className={inputClassName}
                   value={selectedNode.data.model}
@@ -77,7 +84,9 @@ export default function AgentConfig() {
               </label>
 
               <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">DIRECTIVE_PROMPT</span>
+                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                   {lang === 'en' ? 'DIRECTIVE_PROMPT' : 'PROMPT_DE_DIRETIVA'}
+                </span>
                 <textarea
                   className={`${inputClassName} h-48 custom-scrollbar resize-none`}
                   value={selectedNode.data.prompt}
@@ -86,7 +95,9 @@ export default function AgentConfig() {
               </label>
 
               <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">EQUIPPED_TOOLS (CSV)</span>
+                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                   {lang === 'en' ? 'EQUIPPED_TOOLS (CSV)' : 'FERRAMENTAS_EQUIPADAS (CSV)'}
+                </span>
                 <input
                   className={inputClassName}
                   value={selectedNode.data.tools.join(', ')}

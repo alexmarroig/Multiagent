@@ -22,19 +22,41 @@ export function useAuth() {
   const router = useRouter();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkAuth = async () => {
+      // Check for mock admin session first
+      if (typeof window !== 'undefined' && localStorage.getItem('agentos_token') === 'mock-admin-token') {
+        const mockProfile: Profile = {
+          id: 'admin-mock-id',
+          email: 'admin@agentos.tech',
+          full_name: 'Administrator',
+          avatar_url: null,
+          role: 'admin',
+          created_at: new Date().toISOString()
+        };
+        setProfile(mockProfile);
+        setUser({ id: 'admin-mock-id', email: 'admin@agentos.tech' } as any);
+        setLoading(false);
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
+        await fetchProfile(session.user.id);
       } else {
         setLoading(false);
       }
-    });
+    };
+
+    checkAuth();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (typeof window !== 'undefined' && localStorage.getItem('agentos_token') === 'mock-admin-token') {
+        return; // Don't let Supabase overwrite mock admin session
+      }
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -86,6 +108,9 @@ export function useAuth() {
       };
       setProfile(mockProfile);
       setUser({ id: 'admin-mock-id', email: 'admin@agentos.tech' } as any);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('agentos_token', 'mock-admin-token');
+      }
       router.push('/agentos');
       return { user: { id: 'admin-mock-id' }, session: {} };
     }
@@ -101,6 +126,9 @@ export function useAuth() {
   }
 
   async function signOut() {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('agentos_token');
+    }
     await supabase.auth.signOut();
     router.push('/login');
   }

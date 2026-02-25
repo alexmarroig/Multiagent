@@ -47,6 +47,7 @@ export default function AgentCanvas() {
   const setRunState = useCanvasStore((s) => s.setRunState);
   const setSessionId = useCanvasStore((s) => s.setSessionId);
   const setLastResult = useCanvasStore((s) => s.setLastResult);
+  const lang = useCanvasStore((s) => s.language);
 
   const { events, isConnected, isDone, error } = useAgentStream(sessionId);
 
@@ -83,7 +84,11 @@ export default function AgentCanvas() {
     [nodes, nodeStatuses],
   );
 
-  const runButtonText = runState === 'running' ? 'INITIALIZING...' : runState === 'done' ? 'RE_INITIALIZE' : 'RUN_MISSION';
+  const runButtonText = runState === 'running'
+    ? (lang === 'en' ? 'INITIALIZING...' : 'INICIALIZANDO...')
+    : runState === 'done'
+      ? (lang === 'en' ? 'RE_INITIALIZE' : 'REINICIALIZAR')
+      : (lang === 'en' ? 'RUN_MISSION' : 'INICIAR_MISSÃO');
 
   return (
     <main className="relative flex h-full w-full flex-col bg-black overflow-hidden">

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { downloadArtifactExcel, downloadExcel } from '@/lib/api';
 import type { AgentEvent, EventType } from '@/hooks/useAgentStream';
+import { useCanvasStore } from '@/hooks/useCanvasStore';
 
 type ExecutionConsoleProps = {
   events: AgentEvent[];
@@ -52,6 +53,7 @@ function parseArtifactEvent(event: AgentEvent): ArtifactPayload | null {
 export default function ExecutionConsole({ events, isConnected, isDone, error }: ExecutionConsoleProps) {
   const [hiddenUntil, setHiddenUntil] = useState(0);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const lang = useCanvasStore((s) => s.language);
 
   useEffect(() => {
     if (!listRef.current) return;
@@ -100,6 +102,27 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
     });
   };
 
+  const t = {
+    en: {
+      title: 'SYSTEM_LOG_CORE',
+      streaming: 'STREAMING_ACTIVE',
+      done: 'SESSION_TERMINATED_SUCCESSFULLY',
+      fail: 'CRITICAL_SYSTEM_ERROR',
+      clear: 'CLEAR',
+      copy: 'COPY_LOG',
+      export: 'EXPORT_XLSX'
+    },
+    pt: {
+      title: 'LOG_CENTRAL_DO_SISTEMA',
+      streaming: 'STREAMING_ATIVO',
+      done: 'SESSÃO_TERMINADA_COM_SUCESSO',
+      fail: 'ERRO_CRÍTICO_DO_SISTEMA',
+      clear: 'LIMPAR',
+      copy: 'COPIAR_LOG',
+      export: 'EXPORTAR_XLSX'
+    }
+  }[lang];
+
   return (
     <motion.section
       initial={{ y: 100, opacity: 0 }}
@@ -108,26 +131,26 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
     >
       <div className="mb-2 flex items-center justify-between border-b border-white/5 pb-2">
         <div className="flex items-center gap-4">
-          <p className="font-black uppercase tracking-widest text-white/40">SYSTEM_LOG_CORE</p>
+          <p className="font-black uppercase tracking-widest text-white/40">{t.title}</p>
           <div className="flex items-center gap-2">
             {isConnected && (
               <span className="flex items-center gap-1.5 text-cyber-cyan">
                 <span className="h-1 w-1 rounded-full bg-cyber-cyan animate-pulse" />
-                STREAMING_ACTIVE
+                {t.streaming}
               </span>
             )}
             {!isConnected && isDone && !error && (
-              <span className="text-emerald-400">SESSION_TERMINATED_SUCCESSFULLY</span>
+              <span className="text-emerald-400">{t.done}</span>
             )}
-            {error && <span className="text-red-400">CRITICAL_SYSTEM_ERROR</span>}
+            {error && <span className="text-red-400">{t.fail}</span>}
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => setHiddenUntil(Date.now())} className="btn-cyber-outline !px-2 !py-1 !text-[9px] !border-white/10 hover:!border-white/30 text-white/50">
-            CLEAR
+            {t.clear}
           </button>
           <button type="button" onClick={copyAll} className="btn-cyber-outline !px-2 !py-1 !text-[9px] !border-white/10 hover:!border-white/30 text-white/50">
-            COPY_LOG
+            {t.copy}
           </button>
           {excelMentioned && (
             <button type="button" onClick={downloadExcelFromResult} className="btn-cyber-primary !px-3 !py-1 !text-[9px] !bg-emerald-500 !text-black">

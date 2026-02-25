@@ -5,12 +5,14 @@ import { Handle, Position, type NodeProps } from 'reactflow';
 import { motion } from 'framer-motion';
 import { AGENT_COLOR, type AgentNodeData } from '@/types/agentos';
 import { NodeStatusBadge } from '@/components/agentos/NodeStatusBadge';
+import { useCanvasStore } from '@/hooks/useCanvasStore';
 
 type Props = NodeProps<AgentNodeData>;
 
 function AgentNode({ selected, data }: Props) {
   const accentColor = AGENT_COLOR[data.category];
   const isRunning = data.status === 'running';
+  const lang = useCanvasStore((s) => s.language);
 
   return (
     <motion.div
@@ -46,20 +48,20 @@ function AgentNode({ selected, data }: Props) {
 
         <div className="grid grid-cols-2 gap-2 pt-2">
           <div className="bg-white/5 p-1.5 border border-white/5">
-            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">Engine</span>
+            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">{lang === 'en' ? 'Engine' : 'Motor'}</span>
             <span className="text-white font-mono">{data.model.split('/')[1] || data.model}</span>
           </div>
           <div className="bg-white/5 p-1.5 border border-white/5">
-            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">Priority</span>
-            <span className="text-white font-mono">HIGH</span>
+            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">{lang === 'en' ? 'Priority' : 'Prioridade'}</span>
+            <span className="text-white font-mono">{lang === 'en' ? 'HIGH' : 'ALTA'}</span>
           </div>
         </div>
 
         {isRunning && (
           <div className="mt-2">
             <div className="flex justify-between text-[8px] text-cyber-cyan mb-1">
-              <span>PROCESSING</span>
-              <span className="animate-pulse">ACTIVE_STREAM</span>
+              <span>{lang === 'en' ? 'PROCESSING' : 'PROCESSANDO'}</span>
+              <span className="animate-pulse">{lang === 'en' ? 'ACTIVE_STREAM' : 'STREAM_ATIVO'}</span>
             </div>
             <div className="h-1 w-full bg-white/5 overflow-hidden">
               <motion.div
