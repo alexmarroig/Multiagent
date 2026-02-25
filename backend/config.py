@@ -26,6 +26,17 @@ class Settings(BaseSettings):
     supabase_service_role_key: str | None = Field(default=None, alias="SUPABASE_SERVICE_ROLE_KEY")
 
     jwt_secret_key: str = Field(default="dev-secret-change-me", alias="JWT_SECRET_KEY")
+    jwt_issuer: str = Field(default="multiagent-backend", alias="JWT_ISSUER")
+    jwt_audience: str = Field(default="multiagent-clients", alias="JWT_AUDIENCE")
+    jwt_access_expiration_minutes: int = Field(default=15, alias="JWT_ACCESS_EXPIRATION_MINUTES")
+    jwt_refresh_expiration_days: int = Field(default=14, alias="JWT_REFRESH_EXPIRATION_DAYS")
+
+    secret_manager_provider: Literal["env", "supabase"] = Field(
+        default="env", alias="SECRET_MANAGER_PROVIDER"
+    )
+    supabase_secret_table: str = Field(default="secret_versions", alias="SUPABASE_SECRET_TABLE")
+    jwt_access_secret_name: str = Field(default="jwt_access_signing_key", alias="JWT_ACCESS_SECRET_NAME")
+    jwt_refresh_secret_name: str = Field(default="jwt_refresh_signing_key", alias="JWT_REFRESH_SECRET_NAME")
 
     def validate_runtime(self) -> None:
         """Falha rápido em produção quando variáveis críticas não estão definidas."""
@@ -38,6 +49,8 @@ class Settings(BaseSettings):
                 missing.append("SUPABASE_SERVICE_KEY|SUPABASE_SERVICE_ROLE_KEY")
             if self.jwt_secret_key == "dev-secret-change-me":
                 missing.append("JWT_SECRET_KEY (não pode usar valor padrão)")
+            if self.secret_manager_provider == "env":
+                missing.append("SECRET_MANAGER_PROVIDER (use supabase em produção para rotação)")
 
         if missing:
             raise RuntimeError(f"Variáveis obrigatórias ausentes/inválidas: {', '.join(missing)}")
