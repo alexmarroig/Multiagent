@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,6 +15,7 @@ import { CallToActionSection } from '@/components/home/CallToActionSection';
 export default function HomePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [authTimeoutReached, setAuthTimeoutReached] = useState(false);
 
   useEffect(() => {
     if (!loading && user) {
@@ -22,8 +23,27 @@ export default function HomePage() {
     }
   }, [loading, router, user]);
 
-  if (loading) {
-    return null;
+  useEffect(() => {
+    if (!loading) {
+      setAuthTimeoutReached(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setAuthTimeoutReached(true);
+    }, 3000);
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
+  if (loading && !authTimeoutReached) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black text-cyber-cyan">
+        <div className="text-center font-mono text-xs tracking-[0.25em] uppercase">
+          Inicializando landing page...
+        </div>
+      </div>
+    );
   }
 
   return (
