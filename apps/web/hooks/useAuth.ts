@@ -21,10 +21,23 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const hasMockAdminToken = () =>
+    typeof window !== 'undefined' && localStorage.getItem('agentos_token') === 'mock-admin-token';
+
+  const syncMockAdminCookie = (enabled: boolean) => {
+    if (typeof document === 'undefined') return;
+    if (enabled) {
+      document.cookie = 'agentos_mock_admin=1; Path=/; SameSite=Lax';
+      return;
+    }
+    document.cookie = 'agentos_mock_admin=; Path=/; Max-Age=0; SameSite=Lax';
+  };
+
   useEffect(() => {
     const checkAuth = async () => {
       // Check for mock admin session first
-      if (typeof window !== 'undefined' && localStorage.getItem('agentos_token') === 'mock-admin-token') {
+      if (hasMockAdminToken()) {
+        syncMockAdminCookie(true);
         const mockProfile: Profile = {
           id: 'admin-mock-id',
           email: 'admin@agentos.tech',
@@ -54,7 +67,8 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (typeof window !== 'undefined' && localStorage.getItem('agentos_token') === 'mock-admin-token') {
+      if (hasMockAdminToken()) {
+        syncMockAdminCookie(true);
         return; // Don't let Supabase overwrite mock admin session
       }
       setSession(session);
@@ -111,6 +125,7 @@ export function useAuth() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('agentos_token', 'mock-admin-token');
       }
+      syncMockAdminCookie(true);
       router.push('/agentos');
       return { user: { id: 'admin-mock-id' }, session: {} };
     }
@@ -129,6 +144,7 @@ export function useAuth() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('agentos_token');
     }
+    syncMockAdminCookie(false);
     await supabase.auth.signOut();
     router.push('/login');
   }

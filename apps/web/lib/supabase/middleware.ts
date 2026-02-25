@@ -12,6 +12,7 @@ function isPublic(pathname: string) {
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
+  const hasMockAdminSession = req.cookies.get('agentos_mock_admin')?.value === '1';
 
   // Gracefully handle missing Supabase environment variables
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -25,8 +26,12 @@ export async function middleware(req: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
 
-    if (!isPublic(req.nextUrl.pathname) && !session) {
+    if (!isPublic(req.nextUrl.pathname) && !session && !hasMockAdminSession) {
       return NextResponse.redirect(new URL('/login', req.url));
+    }
+
+    if (req.nextUrl.pathname.startsWith('/admin') && hasMockAdminSession) {
+      return res;
     }
 
     if (req.nextUrl.pathname.startsWith('/admin') && session) {
