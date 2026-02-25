@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import traceback
 import uuid
 from datetime import datetime
@@ -13,7 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from auth.dependencies import get_current_user
 from db.supabase_client import get_supabase
 from models.schemas import FlowConfig
-from orchestrator.crew_builder import build_crew_from_config
+from orchestrator.crew_builder import execute_flow_graph
 from orchestrator.event_stream import make_event, publish_event
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -25,10 +24,16 @@ async def execute_flow(flow: FlowConfig) -> None:
     started = datetime.utcnow()
     event_log: list[dict[str, Any]] = []
 
+    degraded_state = {"redis": False, "supabase": False}
+
     async def emit(ev) -> None:
         payload = ev.model_dump(mode="json")
         event_log.append(payload)
-        await publish_event(flow.session_id, ev)
+        try:
+            await publish_event(flow.session_id, ev)
+            degraded_state["redis"] = False
+        except Exception:
+            degraded_state["redis"] = True
 
     await emit(
         make_event(
@@ -54,8 +59,11 @@ async def execute_flow(flow: FlowConfig) -> None:
                 )
             )
 
-        crew = build_crew_from_config(flow)
-        result = await asyncio.to_thread(crew.kickoff, inputs=flow.inputs)
+        def is_degraded() -> bool:
+            return degraded_state["redis"] or degraded_state["supabase"]
+
+        result_map = await execute_flow_graph(flow, health_check=is_degraded)
+        result = result_map.get("supervisor") or str(result_map)
 
         for node in flow.nodes:
             label = getattr(node, "label", node.id)
@@ -89,20 +97,24 @@ async def execute_flow(flow: FlowConfig) -> None:
         )
 
         duration = int((datetime.utcnow() - started).total_seconds())
-        (
-            supabase.table("executions")
-            .update(
-                {
-                    "status": "done",
-                    "result": {"output": str(result)},
-                    "events": event_log,
-                    "completed_at": datetime.utcnow().isoformat(),
-                    "duration_seconds": duration,
-                }
+        try:
+            (
+                supabase.table("executions")
+                .update(
+                    {
+                        "status": "done",
+                        "result": {"output": str(result)},
+                        "events": event_log,
+                        "completed_at": datetime.utcnow().isoformat(),
+                        "duration_seconds": duration,
+                    }
+                )
+                .eq("session_id", flow.session_id)
+                .execute()
             )
-            .eq("session_id", flow.session_id)
-            .execute()
-        )
+            degraded_state["supabase"] = False
+        except Exception:
+            degraded_state["supabase"] = True
 
     except Exception as exc:
         error_payload = {"error": str(exc), "trace": traceback.format_exc()}
@@ -117,19 +129,23 @@ async def execute_flow(flow: FlowConfig) -> None:
                 )
             )
 
-        (
-            supabase.table("executions")
-            .update(
-                {
-                    "status": "error",
-                    "result": error_payload,
-                    "events": event_log,
-                    "completed_at": datetime.utcnow().isoformat(),
-                }
+        try:
+            (
+                supabase.table("executions")
+                .update(
+                    {
+                        "status": "error",
+                        "result": error_payload,
+                        "events": event_log,
+                        "completed_at": datetime.utcnow().isoformat(),
+                    }
+                )
+                .eq("session_id", flow.session_id)
+                .execute()
             )
-            .eq("session_id", flow.session_id)
-            .execute()
-        )
+            degraded_state["supabase"] = False
+        except Exception:
+            degraded_state["supabase"] = True
 
 
 @router.post("/run")
