@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import traceback
 import uuid
 from datetime import datetime
@@ -12,10 +14,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth.dependencies import get_current_user
 from db.supabase_client import get_supabase
 from models.schemas import FlowConfig
+from observability.logging import log_structured
+from observability.metrics import metrics_store
+from orchestrator.crew_builder import build_crew_from_config
 from orchestrator.crew_builder import ExecutionCancelledError, build_crew_from_config
 from orchestrator.event_stream import make_event, publish_event
 
+
 router = APIRouter(prefix="/api/agents", tags=["agents"])
+logger = logging.getLogger("agentos-backend")
 TERMINAL_STATUSES = {"done", "error", "cancelled"}
 RUNNING_EXECUTIONS: dict[str, asyncio.Task[Any]] = {}
 CANCEL_FLAGS: dict[str, asyncio.Event] = {}
@@ -51,6 +58,14 @@ async def execute_flow(flow: FlowConfig) -> None:
     supabase = get_supabase()
     started = datetime.utcnow()
     event_log: list[dict[str, Any]] = []
+    metrics_store.mark_run_started(flow.session_id)
+    log_structured(
+        logger,
+        "flow_execution_started",
+        session_id=flow.session_id,
+        user_id=flow.user_id,
+        agent_id="system",
+    )
     cancel_event = CANCEL_FLAGS.setdefault(flow.session_id, asyncio.Event())
     RUNNING_EXECUTIONS[flow.session_id] = asyncio.current_task()  # type: ignore[assignment]
 
@@ -136,6 +151,28 @@ async def execute_flow(flow: FlowConfig) -> None:
         )
 
         duration = int((datetime.utcnow() - started).total_seconds())
+        metrics_store.mark_run_finished(flow.session_id, "done")
+        log_structured(
+            logger,
+            "flow_execution_done",
+            session_id=flow.session_id,
+            user_id=flow.user_id,
+            agent_id="supervisor",
+            duration_seconds=duration,
+        )
+        (
+            supabase.table("executions")
+            .update(
+                {
+                    "status": "done",
+                    "result": {"output": str(result)},
+                    "events": event_log,
+                    "completed_at": datetime.utcnow().isoformat(),
+                    "duration_seconds": duration,
+                }
+            )
+            .eq("session_id", flow.session_id)
+            .execute()
         _safe_update_execution(
             supabase,
             flow.session_id,
@@ -166,6 +203,15 @@ async def execute_flow(flow: FlowConfig) -> None:
 
     except Exception as exc:
         error_payload = {"error": str(exc), "trace": traceback.format_exc()}
+        metrics_store.mark_run_finished(flow.session_id, "error")
+        log_structured(
+            logger,
+            "flow_execution_error",
+            session_id=flow.session_id,
+            user_id=flow.user_id,
+            agent_id="system",
+            error=str(exc),
+        )
 
         try:
             await emit(make_event(flow.session_id, "system", "AgentOS", "error", error_payload))
@@ -200,6 +246,13 @@ async def run_flow(
 ) -> dict[str, Any]:
     session_id = flow.session_id or str(uuid.uuid4())
     flow = flow.model_copy(update={"session_id": session_id, "user_id": user["id"]})
+    log_structured(
+        logger,
+        "flow_run_requested",
+        session_id=session_id,
+        user_id=user["id"],
+        agent_id="system",
+    )
 
     supabase = get_supabase()
 
