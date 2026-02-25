@@ -44,6 +44,11 @@ export default function AgentSidebar() {
   const addNodeFromTemplate = useCanvasStore((s) => s.addNodeFromTemplate);
   const lang = useCanvasStore((s) => s.language);
 
+  const onDragStart = (event: React.DragEvent, templateId: string) => {
+    event.dataTransfer.setData('application/reactflow', templateId);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
   const grouped = useMemo(() => {
     const map = new Map<AgentCategory, typeof AGENT_TEMPLATES>();
 
@@ -88,27 +93,29 @@ export default function AgentSidebar() {
               <div className="h-px w-full bg-white/5" />
             </div>
             {templates.map((template) => (
-              <motion.button
+              <motion.div
                 key={template.id}
                 variants={itemVariants}
+                draggable
+                onDragStart={(event) => onDragStart(event, template.id)}
                 whileHover={{ x: 5, backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(0, 243, 255, 0.3)' }}
                 whileTap={{ scale: 0.95, x: 10 }}
                 onClick={() => addNodeFromTemplate(template)}
-                className="group w-full border border-white/5 bg-white/[0.02] p-4 text-left transition-all hover:border-cyber-cyan/30"
+                className="group w-full border border-white/10 bg-white/[0.03] p-5 text-left transition-all hover:border-cyber-cyan/50 hover:bg-white/[0.06] cursor-grab active:cursor-grabbing rounded-sm"
               >
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-bold text-white group-hover:text-cyber-cyan transition-colors">
+                <div className="mb-2.5 flex items-center justify-between">
+                  <p className="text-sm font-black text-white group-hover:text-cyber-cyan transition-colors tracking-tight">
                     {template.name}
                   </p>
                   <span
-                    className="h-1.5 w-1.5 rounded-full animate-pulse shadow-[0_0_5px_currentColor]"
+                    className="h-2 w-2 rounded-full animate-pulse shadow-[0_0_8px_currentColor]"
                     style={{ color: AGENT_COLOR[template.category], backgroundColor: 'currentColor' }}
                   />
                 </div>
-                <p className="text-[10px] font-mono leading-relaxed text-neutral-500 group-hover:text-neutral-300">
+                <p className="text-[11px] font-medium leading-relaxed text-neutral-400 group-hover:text-neutral-200">
                   {template.description}
                 </p>
-              </motion.button>
+              </motion.div>
             ))}
           </section>
         ))}

@@ -17,8 +17,8 @@ export default function LoginPage() {
     en: {
       title: 'Terminal_Access',
       subtitle: 'SECURE_NEURAL_LINK_V4.0',
-      identity: 'IDENTITY_ID',
-      key: 'ACCESS_CRYPT_KEY',
+      identity: 'ACCESS_ID / EMAIL',
+      key: 'SECURE_ACCESS_KEY / PASSWORD',
       button: 'INITIALIZE_SESSION',
       loading: 'ESTABLISHING_LINK...',
       request: '[ REQUEST_NEW_ACCESS_ID ]',
@@ -28,8 +28,8 @@ export default function LoginPage() {
     pt: {
       title: 'Acesso_ao_Terminal',
       subtitle: 'LINK_NEURAL_SEGURO_V4.0',
-      identity: 'IDENTIDADE_ID',
-      key: 'CHAVE_DE_ACESSO_CRIPT',
+      identity: 'ID_DE_ACESSO / E-MAIL',
+      key: 'CHAVE_DE_ACESSO / SENHA',
       button: 'INICIALIZAR_SESSÃO',
       loading: 'ESTABELECENDO_LINK...',
       request: '[ SOLICITAR_NOVO_ACESSO ]',

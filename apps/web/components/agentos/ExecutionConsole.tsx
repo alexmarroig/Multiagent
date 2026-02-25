@@ -52,6 +52,7 @@ function parseArtifactEvent(event: AgentEvent): ArtifactPayload | null {
 
 export default function ExecutionConsole({ events, isConnected, isDone, error }: ExecutionConsoleProps) {
   const [hiddenUntil, setHiddenUntil] = useState(0);
+  const [view, setView] = useState<'logs' | 'metrics'>('logs');
   const listRef = useRef<HTMLDivElement | null>(null);
   const lang = useCanvasStore((s) => s.language);
 
@@ -64,6 +65,30 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
     () => events.filter((event) => new Date(event.timestamp).getTime() >= hiddenUntil),
     [events, hiddenUntil],
   );
+
+  const metrics = useMemo(() => {
+    if (!events.length) return null;
+    const start = new Date(events[0].timestamp).getTime();
+    const end = isDone ? new Date(events[events.length - 1].timestamp).getTime() : Date.now();
+    const duration = Math.max(0, (end - start) / 1000);
+
+    const toolCalls = events.filter(e => e.event_type === 'tool_call').length;
+    const uniqueAgents = new Set(events.map(e => e.agent_id)).size;
+    const errors = events.filter(e => e.event_type === 'error').length;
+
+    // Mock token calculation: roughly 4 chars per token
+    const totalChars = events.reduce((acc, e) => acc + (typeof e.content === 'string' ? e.content.length : 0), 0);
+    const estTokens = Math.floor(totalChars / 4);
+
+    return {
+      duration: duration.toFixed(1),
+      toolCalls,
+      uniqueAgents,
+      errors,
+      estTokens,
+      cost: (estTokens * 0.00001).toFixed(4) // Mock cost
+    };
+  }, [events, isDone]);
 
   const latestExcelArtifact = useMemo(() => {
     for (let idx = visibleEvents.length - 1; idx >= 0; idx -= 1) {
@@ -110,7 +135,9 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
       fail: 'CRITICAL_SYSTEM_ERROR',
       clear: 'CLEAR',
       copy: 'COPY_LOG',
-      export: 'EXPORT_XLSX'
+      export: 'EXPORT_XLSX',
+      logs: 'LOGS',
+      metrics: 'METRICS'
     },
     pt: {
       title: 'LOG_CENTRAL_DO_SISTEMA',
@@ -119,7 +146,9 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
       fail: 'ERRO_CRÍTICO_DO_SISTEMA',
       clear: 'LIMPAR',
       copy: 'COPIAR_LOG',
-      export: 'EXPORTAR_XLSX'
+      export: 'EXPORTAR_XLSX',
+      logs: 'LOGS',
+      metrics: 'MÉTRICAS'
     }
   }[lang];
 
@@ -130,8 +159,21 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
       className="h-72 border-t border-white/10 bg-black/60 backdrop-blur-md p-3 font-mono text-[10px]"
     >
       <div className="mb-2 flex items-center justify-between border-b border-white/5 pb-2">
-        <div className="flex items-center gap-4">
-          <p className="font-black uppercase tracking-widest text-white/40">{t.title}</p>
+        <div className="flex items-center gap-6">
+          <div className="flex bg-white/5 p-0.5 border border-white/10">
+            <button
+              onClick={() => setView('logs')}
+              className={`px-3 py-1 text-[9px] font-bold transition-all ${view === 'logs' ? 'bg-cyber-cyan text-black' : 'text-neutral-500 hover:text-white'}`}
+            >
+              {t.logs}
+            </button>
+            <button
+              onClick={() => setView('metrics')}
+              className={`px-3 py-1 text-[9px] font-bold transition-all ${view === 'metrics' ? 'bg-cyber-cyan text-black' : 'text-neutral-500 hover:text-white'}`}
+            >
+              {t.metrics}
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             {isConnected && (
               <span className="flex items-center gap-1.5 text-cyber-cyan">
@@ -161,8 +203,56 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
       </div>
 
       <div ref={listRef} className="h-56 overflow-auto pr-2 custom-scrollbar">
-        <AnimatePresence initial={false}>
-          {visibleEvents.map((event, index) => {
+        <AnimatePresence mode="wait">
+          {view === 'metrics' ? (
+            metrics ? (
+            <motion.div
+              key="metrics-view"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6"
+            >
+              <div className="glass-panel p-4 border-white/5">
+                <p className="text-[9px] text-neutral-500 uppercase mb-1">TOTAL_TIME</p>
+                <p className="text-2xl font-black text-cyber-cyan">{metrics.duration}s</p>
+              </div>
+              <div className="glass-panel p-4 border-white/5">
+                <p className="text-[9px] text-neutral-500 uppercase mb-1">AGENTS_ENGAGED</p>
+                <p className="text-2xl font-black text-white">{metrics.uniqueAgents}</p>
+              </div>
+              <div className="glass-panel p-4 border-white/5">
+                <p className="text-[9px] text-neutral-500 uppercase mb-1">TOOL_EXECUTIONS</p>
+                <p className="text-2xl font-black text-cyber-magenta">{metrics.toolCalls}</p>
+              </div>
+              <div className="glass-panel p-4 border-white/5">
+                <p className="text-[9px] text-neutral-500 uppercase mb-1">FAILURES_DETECTED</p>
+                <p className={`text-2xl font-black ${metrics.errors > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{metrics.errors}</p>
+              </div>
+              <div className="glass-panel p-4 border-white/5">
+                <p className="text-[9px] text-neutral-500 uppercase mb-1">ESTIMATED_TOKENS</p>
+                <p className="text-2xl font-black text-amber-500">{metrics.estTokens}</p>
+              </div>
+              <div className="glass-panel p-4 border-white/5">
+                <p className="text-[9px] text-neutral-500 uppercase mb-1">MOCK_COST_EST</p>
+                <p className="text-2xl font-black text-white">${metrics.cost}</p>
+              </div>
+            </motion.div>
+            ) : (
+              <motion.div
+                key="no-metrics"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="h-full flex flex-col items-center justify-center text-neutral-700 font-mono"
+              >
+                <div className="h-12 w-12 border border-dashed border-white/10 rounded-full flex items-center justify-center mb-4">
+                  <div className="h-2 w-2 bg-white/10 rounded-full animate-ping" />
+                </div>
+                <p className="text-[10px] tracking-widest uppercase">{lang === 'en' ? 'AWAITING_MISSION_TELEMETRY' : 'AGUARDANDO_TELEMETRIA_DA_MISSÃO'}</p>
+              </motion.div>
+            )
+          ) : (
+            visibleEvents.map((event, index) => {
             const style = EVENT_STYLE[event.event_type];
             return (
               <motion.article
@@ -185,7 +275,8 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
                 </div>
               </motion.article>
             );
-          })}
+          })
+          )}
         </AnimatePresence>
       </div>
     </motion.section>

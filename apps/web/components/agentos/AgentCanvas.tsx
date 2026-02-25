@@ -4,6 +4,7 @@ import 'reactflow/dist/style.css';
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactFlow, { Background, Controls, MiniMap, type ReactFlowInstance } from 'reactflow';
+import { AGENT_TEMPLATES } from '@/types/agentos';
 import AgentNode from '@/components/agentos/AgentNode';
 import ExecutionConsole from '@/components/agentos/ExecutionConsole';
 import RunModal from '@/components/agentos/RunModal';
@@ -47,9 +48,33 @@ export default function AgentCanvas() {
   const setRunState = useCanvasStore((s) => s.setRunState);
   const setSessionId = useCanvasStore((s) => s.setSessionId);
   const setLastResult = useCanvasStore((s) => s.setLastResult);
+  const addNodeFromTemplate = useCanvasStore((s) => s.addNodeFromTemplate);
+  const reLayout = useCanvasStore((s) => s.reLayout);
   const lang = useCanvasStore((s) => s.language);
 
   const { events, isConnected, isDone, error } = useAgentStream(sessionId);
+
+  const onDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const onDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+
+    const templateId = event.dataTransfer.getData('application/reactflow');
+    if (!templateId || !rfInstance) return;
+
+    const template = AGENT_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return;
+
+    const position = rfInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    addNodeFromTemplate(template, position);
+  };
 
   useEffect(() => {
     if (error) setRunState('error');
@@ -93,23 +118,34 @@ export default function AgentCanvas() {
   return (
     <main className="relative flex h-full w-full flex-col bg-black overflow-hidden">
       {/* HUD Controls */}
-      <div className="absolute right-6 top-6 z-10 flex gap-3">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          type="button"
-          onClick={() => setShowTemplates(true)}
-          className="btn-cyber-outline !px-4 !py-2 !text-xs !border-white/20 !text-white/70"
-        >
-          MISSION_TEMPLATES
-        </motion.button>
+      <div className="absolute right-6 top-6 z-10 flex flex-col items-end gap-3">
+        <div className="flex gap-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => reLayout()}
+            className="btn-cyber-outline !px-3 !py-1.5 !text-[9px] !border-white/20 !text-white/70"
+          >
+            {lang === 'en' ? 'AUTO_LAYOUT' : 'LAYOUT_AUTO'}
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => setShowTemplates(true)}
+            className="btn-cyber-outline !px-3 !py-1.5 !text-[9px] !border-white/20 !text-white/70"
+          >
+            MISSION_TEMPLATES
+          </motion.button>
+        </div>
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           type="button"
           onClick={() => setShowRunModal(true)}
           disabled={nodes.length === 0 || runState === 'running'}
-          className={`btn-cyber-primary !px-6 !py-2 !text-xs ${
+          className={`btn-cyber-primary !px-8 !py-3 !text-[11px] ${
             runState === 'running' ? 'animate-pulse !bg-amber-500 !text-black' :
             runState === 'done' ? '!bg-cyber-magenta !text-white' : ''
           }`}
@@ -140,6 +176,8 @@ export default function AgentCanvas() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
           onNodeClick={(_, node) => selectNode(node.id)}
           onPaneClick={() => selectNode(null)}
         >

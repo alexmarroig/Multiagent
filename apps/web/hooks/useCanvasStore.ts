@@ -29,7 +29,7 @@ type CanvasStore = {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
-  addNodeFromTemplate: (template: AgentTemplate) => void;
+  addNodeFromTemplate: (template: AgentTemplate, position?: { x: number; y: number }) => void;
   selectNode: (id: string | null) => void;
   updateNodeData: (id: string, data: Partial<AgentNodeData>) => void;
   appendLog: (line: string) => void;
@@ -40,8 +40,10 @@ type CanvasStore = {
   setLastResult: (result: string) => void;
   setBackendOnline: (value: boolean) => void;
   resetRun: () => void;
+  reLayout: () => void;
   saveFlow: (name: string, description?: string) => Promise<unknown>;
   loadFlow: (flowId: string) => Promise<void>;
+  listFlows: () => Promise<any[]>;
 };
 
 const defaultNodes: Node<AgentNodeData>[] = [
@@ -88,28 +90,46 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       }, state.edges),
     })),
 
-  addNodeFromTemplate: (template) =>
+  addNodeFromTemplate: (template, position) =>
     set((state) => {
       const id = `node-${template.id}-${Date.now()}`;
       const count = state.nodes.length;
+
+      const newNode: Node<AgentNodeData> = {
+        id,
+        type: 'agentNode',
+        position: position || { x: 160 + (count % 3) * 280, y: 110 + Math.floor(count / 3) * 180 },
+        data: {
+          label: template.name,
+          category: template.category,
+          description: template.description,
+          model: 'gpt-4o-mini',
+          prompt: template.defaultPrompt,
+          tools: template.defaultTools,
+          status: 'idle',
+        },
+      };
+
+      const newNodes = [...state.nodes, newNode];
+
+      // Auto-connect to Supervisor if it exists and this is not the supervisor itself
+      let newEdges = [...state.edges];
+      if (template.category !== 'supervisor') {
+        const supervisor = state.nodes.find(n => n.data.category === 'supervisor');
+        if (supervisor) {
+          newEdges = addEdge({
+            id: `edge-${supervisor.id}-${id}`,
+            source: supervisor.id,
+            target: id,
+            animated: true,
+            style: { stroke: 'rgba(0, 243, 255, 0.4)', strokeWidth: 1.5 }
+          }, newEdges);
+        }
+      }
+
       return {
-        nodes: [
-          ...state.nodes,
-          {
-            id,
-            type: 'agentNode',
-            position: { x: 160 + (count % 3) * 280, y: 110 + Math.floor(count / 3) * 180 },
-            data: {
-              label: template.name,
-              category: template.category,
-              description: template.description,
-              model: 'gpt-4o-mini',
-              prompt: template.defaultPrompt,
-              tools: template.defaultTools,
-              status: 'idle',
-            },
-          },
-        ],
+        nodes: newNodes,
+        edges: newEdges,
         selectedNodeId: id,
       };
     }),
@@ -128,6 +148,33 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setLastResult: (result) => set({ lastResult: result }),
   setBackendOnline: (value) => set({ backendOnline: value }),
   resetRun: () => set({ sessionId: null, runState: 'idle', nodeStatuses: {}, lastResult: null }),
+
+  reLayout: () => set((state) => {
+    const supervisor = state.nodes.find(n => n.data.category === 'supervisor');
+    const others = state.nodes.filter(n => n.data.category !== 'supervisor');
+
+    const centerX = 450;
+    const centerY = 220;
+    const radius = 300;
+
+    const newNodes = state.nodes.map(node => {
+      if (node.data.category === 'supervisor') {
+        return { ...node, position: { x: centerX, y: centerY } };
+      }
+
+      const idx = others.findIndex(n => n.id === node.id);
+      const angle = (idx / others.length) * 2 * Math.PI;
+      return {
+        ...node,
+        position: {
+          x: centerX + Math.cos(angle) * radius,
+          y: centerY + Math.sin(angle) * radius
+        }
+      };
+    });
+
+    return { nodes: newNodes };
+  }),
 
   saveFlow: async (name, description = '') => {
     const { nodes, edges } = get();
@@ -169,6 +216,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       edges: flow.config?.edges ?? [],
       selectedNodeId: flow.config?.nodes?.[0]?.id ?? null,
     });
+  },
+
+  listFlows: async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+    const response = await fetch(`${apiBase}/api/flows`, {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    });
+
+    const data = await response.json();
+    return data.flows || [];
   },
 }));
 
