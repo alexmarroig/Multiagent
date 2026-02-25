@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from auth.jwt_handler import verify_token
+from auth.jwt_handler import verify_access_token
 from db.supabase_client import get_supabase
 
 security = HTTPBearer()
@@ -15,7 +15,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
     token = credentials.credentials
-    payload = verify_token(token)
+    payload = verify_access_token(token)
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -30,7 +30,7 @@ async def get_current_user(
         )
 
     supabase = get_supabase()
-    result = supabase.table("profiles").select("*").eq("id", user_id).execute()
+    result = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
