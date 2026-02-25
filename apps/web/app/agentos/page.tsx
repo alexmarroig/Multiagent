@@ -7,6 +7,8 @@ import AgentCanvas from '@/components/agentos/AgentCanvas';
 import AgentConfig from '@/components/agentos/AgentConfig';
 import AgentSidebar from '@/components/agentos/AgentSidebar';
 import Tutorial from '@/components/agentos/Tutorial';
+import SaveFlowModal from '@/components/agentos/SaveFlowModal';
+import LoadFlowModal from '@/components/agentos/LoadFlowModal';
 import { healthCheck } from '@/lib/api';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,6 +17,8 @@ export default function AgentOSPage() {
   const lang = useCanvasStore((s) => s.language);
   const setLang = useCanvasStore((s) => s.setLanguage);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
   const backendOnline = useCanvasStore((s) => s.backendOnline);
   const setBackendOnline = useCanvasStore((s) => s.setBackendOnline);
   const saveFlow = useCanvasStore((s) => s.saveFlow);
@@ -23,13 +27,6 @@ export default function AgentOSPage() {
   useEffect(() => {
     healthCheck().then((isOnline) => setBackendOnline(isOnline));
   }, [setBackendOnline]);
-
-  async function handleSave() {
-    const promptMsg = lang === 'en' ? 'DEPLOYMENT_IDENTIFIER:' : 'IDENTIFICADOR_DO_FLUXO:';
-    const name = window.prompt(promptMsg);
-    if (!name) return;
-    await saveFlow(name);
-  }
 
   const t = {
     en: {
@@ -43,6 +40,7 @@ export default function AgentOSPage() {
       diagnostics: 'DIAGNOSTICS_MODE',
       terminate: 'TERMINATE_SESSION',
       backup: 'BACKUP_FLOW',
+      restore: 'RESTORE_FLOW',
       tutorial: 'TUTORIAL'
     },
     pt: {
@@ -56,6 +54,7 @@ export default function AgentOSPage() {
       diagnostics: 'MODO_DIAGNÓSTICO',
       terminate: 'ENCERRAR_SESSÃO',
       backup: 'SALVAR_FLUXO',
+      restore: 'CARREGAR_FLUXO',
       tutorial: 'TUTORIAL'
     }
   }[lang];
@@ -114,10 +113,17 @@ export default function AgentOSPage() {
             </button>
 
             <button
-              onClick={handleSave}
+              onClick={() => setShowLoadModal(true)}
               className="btn-cyber-outline !px-4 !py-1.5 !text-[10px] !border-white/20 hover:!border-cyber-cyan text-white/70"
             >
-              [ {lang === 'en' ? 'BACKUP_FLOW' : 'SALVAR_FLUXO'} ]
+              [ {t.restore} ]
+            </button>
+
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="btn-cyber-outline !px-4 !py-1.5 !text-[10px] !border-white/20 hover:!border-cyber-cyan text-white/70"
+            >
+              [ {t.backup} ]
             </button>
 
             <div className="h-8 w-px bg-white/10" />
@@ -186,6 +192,18 @@ export default function AgentOSPage() {
       <AnimatePresence>
         {showTutorial && (
           <Tutorial language={lang} onClose={() => setShowTutorial(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSaveModal && (
+          <SaveFlowModal onClose={() => setShowSaveModal(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showLoadModal && (
+          <LoadFlowModal onClose={() => setShowLoadModal(false)} />
         )}
       </AnimatePresence>
     </div>

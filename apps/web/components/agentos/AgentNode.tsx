@@ -18,14 +18,13 @@ function AgentNode({ selected, data }: Props) {
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      className={`relative min-w-[240px] max-w-[280px] overflow-hidden rounded-none border-t-2 bg-black/80 backdrop-blur-md transition-all duration-300 ${
-        selected ? 'shadow-[0_0_20px_rgba(255,255,255,0.1)]' : ''
+      className={`relative min-w-[260px] max-w-[300px] overflow-hidden rounded-sm border-t-4 bg-black/90 backdrop-blur-md transition-all duration-300 ${
+        selected ? 'shadow-[0_0_25px_rgba(255,255,255,0.15)] ring-1 ring-white/20' : ''
       }`}
       style={{
         borderTopColor: accentColor,
-        borderColor: selected ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.05)',
+        borderColor: selected ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.1)',
         borderWidth: 1,
-        borderTopWidth: 4,
       }}
     >
       <Handle
@@ -38,22 +37,22 @@ function AgentNode({ selected, data }: Props) {
         <NodeStatusBadge status={data.status ?? 'idle'} />
       </div>
 
-      <div className="px-4 py-3 border-b border-white/5 bg-white/[0.02]">
-        <p className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase mb-1">NODE_ID: {data.category}</p>
-        <p className="text-sm font-black text-white tracking-tight">{data.label}</p>
+      <div className="px-5 py-4 border-b border-white/10 bg-white/[0.03]">
+        <p className="text-[11px] font-mono tracking-widest text-neutral-400 uppercase mb-1.5">NODE_ID: {data.category}</p>
+        <p className="text-base font-black text-white tracking-tight">{data.label}</p>
       </div>
 
-      <div className="space-y-3 p-4 text-[11px] font-light text-neutral-400">
-        <p className="line-clamp-2 italic">&quot;{data.description}&quot;</p>
+      <div className="space-y-4 p-5 text-[12px] font-medium text-neutral-300">
+        <p className="line-clamp-3 italic leading-relaxed text-neutral-400">&quot;{data.description}&quot;</p>
 
-        <div className="grid grid-cols-2 gap-2 pt-2">
-          <div className="bg-white/5 p-1.5 border border-white/5">
-            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">{lang === 'en' ? 'Engine' : 'Motor'}</span>
-            <span className="text-white font-mono">{data.model.split('/')[1] || data.model}</span>
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="bg-white/5 p-2 border border-white/10 rounded-sm">
+            <span className="block text-[9px] text-neutral-500 font-bold uppercase mb-1">{lang === 'en' ? 'Engine' : 'Motor'}</span>
+            <span className="text-white font-mono font-bold">{data.model.split('/')[1] || data.model}</span>
           </div>
-          <div className="bg-white/5 p-1.5 border border-white/5">
-            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">{lang === 'en' ? 'Priority' : 'Prioridade'}</span>
-            <span className="text-white font-mono">{lang === 'en' ? 'HIGH' : 'ALTA'}</span>
+          <div className="bg-white/5 p-2 border border-white/10 rounded-sm">
+            <span className="block text-[9px] text-neutral-500 font-bold uppercase mb-1">{lang === 'en' ? 'Priority' : 'Prioridade'}</span>
+            <span className="text-white font-mono font-bold text-cyber-cyan">{lang === 'en' ? 'HIGH' : 'ALTA'}</span>
           </div>
         </div>
 

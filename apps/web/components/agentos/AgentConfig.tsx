@@ -62,7 +62,7 @@ export default function AgentConfig() {
 
             <div className="space-y-4">
               <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
                    {lang === 'en' ? 'DESIGNATION' : 'DESIGNAÇÃO'}
                 </span>
                 <input
@@ -73,7 +73,7 @@ export default function AgentConfig() {
               </label>
 
               <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
                    {lang === 'en' ? 'CORE_ENGINE' : 'MOTOR_PRINCIPAL'}
                 </span>
                 <input
@@ -84,11 +84,11 @@ export default function AgentConfig() {
               </label>
 
               <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
                    {lang === 'en' ? 'DIRECTIVE_PROMPT' : 'PROMPT_DE_DIRETIVA'}
                 </span>
                 <textarea
-                  className={`${inputClassName} h-48 custom-scrollbar resize-none`}
+                  className={`${inputClassName} h-48 custom-scrollbar resize-none font-sans font-medium text-[13px] leading-relaxed p-4`}
                   value={selectedNode.data.prompt}
                   onChange={(e) => updateNodeData(selectedNode.id, { prompt: e.target.value })}
                 />
