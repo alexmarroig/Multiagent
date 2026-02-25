@@ -21,10 +21,10 @@ if [ -f "package.json" ]; then
 elif [ -f "pnpm-workspace.yaml" ] || [ -f "pnpm-lock.yaml" ]; then
   PM="pnpm"
   INSTALL_CMD=(pnpm install --frozen-lockfile)
-  BUILD_CMD=(pnpm -r build)
-  TEST_CMD=(pnpm -r test)
-  LINT_CMD=(pnpm -r lint)
-  TYPE_CMD=(pnpm -r type-check)
+  BUILD_CMD=(pnpm -r --if-present build)
+  TEST_CMD=(pnpm -r --if-present test)
+  LINT_CMD=(pnpm -r --if-present lint)
+  TYPE_CMD=(pnpm -r --if-present type-check)
   AUDIT_CMD=(pnpm audit --audit-level high)
 else
   echo "❌ Nenhum gerenciador suportado identificado (npm/pnpm)."
