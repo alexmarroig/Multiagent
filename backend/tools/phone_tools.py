@@ -13,18 +13,42 @@ def make_phone_call(to_number: str, script: str, language: str = "pt-BR") -> dic
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
     from_number = os.getenv("TWILIO_PHONE_NUMBER")
+    app_env = os.getenv("APP_ENV", "dev").lower()
 
     if not account_sid or not auth_token or not from_number:
+        if app_env == "dev":
+            return {
+                "success": True,
+                "warning": "Credenciais Twilio não configuradas. Operação simulada.",
+                "status": "simulated",
+                "provider": "twilio",
+                "mode": "simulated",
+            }
+
         return {
             "success": False,
-            "warning": "Credenciais Twilio não configuradas. Operação simulada.",
-            "status": "simulated",
+            "error": "Credenciais Twilio ausentes em ambiente de produção.",
+            "status": "failed",
+            "provider": "twilio",
+            "mode": "real",
         }
 
     try:
         client = Client(account_sid, auth_token)
         twiml = f'<Response><Say language="{language}" voice="Polly.Camila">{script}</Say></Response>'
         call = client.calls.create(to=to_number, from_=from_number, twiml=twiml)
-        return {"success": True, "call_sid": call.sid, "status": call.status}
+        return {
+            "success": True,
+            "call_sid": call.sid,
+            "status": call.status,
+            "provider": "twilio",
+            "mode": "real",
+        }
     except Exception as exc:
-        return {"success": False, "error": str(exc), "status": "failed"}
+        return {
+            "success": False,
+            "error": str(exc),
+            "status": "failed",
+            "provider": "twilio",
+            "mode": "real",
+        }
