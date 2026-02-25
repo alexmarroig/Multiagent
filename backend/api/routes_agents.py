@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import traceback
 import uuid
 from datetime import datetime
@@ -13,10 +14,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from auth.dependencies import get_current_user
 from db.supabase_client import get_supabase
 from models.schemas import FlowConfig
+from observability.logging import log_structured
+from observability.metrics import metrics_store
 from orchestrator.crew_builder import build_crew_from_config
 from orchestrator.event_stream import make_event, publish_event
 
+
 router = APIRouter(prefix="/api/agents", tags=["agents"])
+logger = logging.getLogger("agentos-backend")
 
 
 async def execute_flow(flow: FlowConfig) -> None:
@@ -24,6 +29,14 @@ async def execute_flow(flow: FlowConfig) -> None:
     supabase = get_supabase()
     started = datetime.utcnow()
     event_log: list[dict[str, Any]] = []
+    metrics_store.mark_run_started(flow.session_id)
+    log_structured(
+        logger,
+        "flow_execution_started",
+        session_id=flow.session_id,
+        user_id=flow.user_id,
+        agent_id="system",
+    )
 
     async def emit(ev) -> None:
         payload = ev.model_dump(mode="json")
@@ -89,6 +102,15 @@ async def execute_flow(flow: FlowConfig) -> None:
         )
 
         duration = int((datetime.utcnow() - started).total_seconds())
+        metrics_store.mark_run_finished(flow.session_id, "done")
+        log_structured(
+            logger,
+            "flow_execution_done",
+            session_id=flow.session_id,
+            user_id=flow.user_id,
+            agent_id="supervisor",
+            duration_seconds=duration,
+        )
         (
             supabase.table("executions")
             .update(
@@ -106,6 +128,15 @@ async def execute_flow(flow: FlowConfig) -> None:
 
     except Exception as exc:
         error_payload = {"error": str(exc), "trace": traceback.format_exc()}
+        metrics_store.mark_run_finished(flow.session_id, "error")
+        log_structured(
+            logger,
+            "flow_execution_error",
+            session_id=flow.session_id,
+            user_id=flow.user_id,
+            agent_id="system",
+            error=str(exc),
+        )
 
         try:
             await emit(make_event(flow.session_id, "system", "AgentOS", "error", error_payload))
@@ -140,6 +171,13 @@ async def run_flow(
 ) -> dict[str, Any]:
     session_id = flow.session_id or str(uuid.uuid4())
     flow = flow.model_copy(update={"session_id": session_id, "user_id": user["id"]})
+    log_structured(
+        logger,
+        "flow_run_requested",
+        session_id=session_id,
+        user_id=user["id"],
+        agent_id="system",
+    )
 
     supabase = get_supabase()
 

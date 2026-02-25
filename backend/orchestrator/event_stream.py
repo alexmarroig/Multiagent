@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime
 from typing import AsyncGenerator
@@ -10,8 +11,10 @@ from typing import AsyncGenerator
 from redis.asyncio import Redis
 
 from models.schemas import AgentEvent
+from observability.logging import log_structured
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+logger = logging.getLogger("agentos-orchestrator")
 
 
 def _get_redis_client() -> Redis:
@@ -42,6 +45,7 @@ async def publish_event(session_id: str, event: AgentEvent) -> None:
     try:
         channel = f"session:{session_id}"
         await redis.publish(channel, event.model_dump_json())
+        log_structured(logger, "event_published", session_id=session_id, agent_id=event.agent_id)
     finally:
         await redis.close()
 
@@ -58,6 +62,7 @@ async def subscribe_events(session_id: str) -> AsyncGenerator[AgentEvent, None]:
                 continue
             data = json.loads(message["data"])
             event = AgentEvent.model_validate(data)
+            log_structured(logger, "event_received", session_id=session_id, agent_id=event.agent_id)
             yield event
             if event.event_type in {"done", "error"}:
                 break

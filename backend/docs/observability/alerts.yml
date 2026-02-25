@@ -1,0 +1,22 @@
+# Regras base para alerting (podem ser traduzidas para Grafana/Alertmanager/Datadog)
+alerts:
+  - id: websocket-failure-spike
+    description: "Falha de websocket acima do normal em janela curta"
+    source_metric: "websocket.failures"
+    condition: "increase(websocket.failures[5m]) >= 5"
+    severity: critical
+    runbook: "Verificar Redis PubSub, disponibilidade de /ws/{session_id} e logs websocket_stream_error."
+
+  - id: external-integration-error-rate
+    description: "Taxa de erro em integrações externas acima do limite"
+    source_metric: "external_integrations.<tool_id>.error_rate"
+    condition: "avg_over_time(external_integrations.*.error_rate[10m]) > 0.10"
+    severity: warning
+    runbook: "Inspecionar provider externo (Tavily, Twilio, Google, Yahoo Finance), aplicar retry/circuit breaker."
+
+  - id: execution-backlog-growth
+    description: "Backlog de execuções em crescimento"
+    source_metric: "runs.backlog_running"
+    condition: "runs.backlog_running >= 20 for 10m"
+    severity: warning
+    runbook: "Escalar workers, revisar latência de tasks e saturação de API/LLM."

@@ -10,7 +10,9 @@ Responsabilidades:
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+import time
 from collections import defaultdict, deque
 from typing import Any, Callable, Iterable, Mapping
 
@@ -20,6 +22,8 @@ from langchain_community.chat_models import ChatOllama
 from langchain_openai import ChatOpenAI
 
 from models.schemas import AgentType, FlowConfig, LLMProvider, NodeConfig
+from observability.logging import log_structured
+from observability.metrics import metrics_store
 from orchestrator.event_stream import make_event, publish_event
 from tools.browser_tools import browse_website, search_hotels
 from tools.calendar_tools import schedule_meeting
@@ -43,6 +47,10 @@ DEFAULT_PROMPTS: dict[AgentType, str] = {
 }
 
 # Observação: CrewAI costuma aceitar callables (tools) no Agent. Mantive esse padrão.
+
+logger = logging.getLogger("agentos-orchestrator")
+
+EXTERNAL_TOOLS = {"excel", "phone", "calendar", "search", "finance", "browser", "travel"}
 TOOL_REGISTRY: Mapping[str, Any] = {
     "excel": create_excel_spreadsheet,
     "phone": make_phone_call,
@@ -77,19 +85,34 @@ def _publish_event_sync(
     loop.create_task(publish_event(session_id, event))
 
 
-def _make_step_callback(session_id: str, node: NodeConfig) -> Callable[[Any], None]:
+def _make_step_callback(session_id: str, user_id: str, node: NodeConfig) -> Callable[[Any], None]:
     """Callback por step/tool-use. Mantém payload tolerante a diferentes shapes."""
     def _step_callback(step: Any) -> None:
+        tool = getattr(step, "tool", None)
+        result = getattr(step, "result", None)
+        success = not (isinstance(result, dict) and result.get("error"))
+        if tool:
+            metrics_store.record_tool_call(str(tool), success=success, external=str(tool) in EXTERNAL_TOOLS)
+
+        log_structured(
+            logger,
+            "tool_step",
+            session_id=session_id,
+            user_id=user_id,
+            agent_id=node.id,
+            tool_id=str(tool) if tool else None,
+            success=success,
+        )
         _publish_event_sync(
             session_id=session_id,
             agent_id=node.id,
             agent_name=node.label,
             event_type="tool_call",
             content={
-                "tool": getattr(step, "tool", None),
+                "tool": tool,
                 "tool_input": getattr(step, "tool_input", None),
                 "thought": getattr(step, "thought", None),
-                "result": getattr(step, "result", None),
+                "result": result,
             },
         )
 
@@ -110,11 +133,12 @@ def _make_task_callback(session_id: str, node: NodeConfig) -> Callable[[Any], No
     return _task_callback
 
 
-def _wrap_task_execution(task: Task, session_id: str, node: NodeConfig) -> None:
+def _wrap_task_execution(task: Task, session_id: str, user_id: str, node: NodeConfig) -> None:
     """Envolve execute_sync para publicar 'thinking' e 'error'."""
     original_execute_sync = task.execute_sync
 
     def execute_sync_with_hooks(*args: Any, **kwargs: Any) -> Any:
+        started = time.monotonic()
         _publish_event_sync(
             session_id=session_id,
             agent_id=node.id,
@@ -123,8 +147,28 @@ def _wrap_task_execution(task: Task, session_id: str, node: NodeConfig) -> None:
             content=f"{node.label} iniciou a tarefa.",
         )
         try:
-            return original_execute_sync(*args, **kwargs)
+            result = original_execute_sync(*args, **kwargs)
+            latency = time.monotonic() - started
+            metrics_store.record_task_latency(node.id, latency)
+            log_structured(
+                logger,
+                "task_finished",
+                session_id=session_id,
+                user_id=user_id,
+                agent_id=node.id,
+                latency_seconds=round(latency, 4),
+            )
+            return result
         except Exception as exc:
+            metrics_store.record_task_latency(node.id, time.monotonic() - started)
+            log_structured(
+                logger,
+                "task_failed",
+                session_id=session_id,
+                user_id=user_id,
+                agent_id=node.id,
+                error=str(exc),
+            )
             _publish_event_sync(
                 session_id=session_id,
                 agent_id=node.id,
@@ -215,6 +259,7 @@ def topological_sort(nodes: list[NodeConfig], edges: list[tuple[str, str]]) -> l
 def build_crew_from_config(flow: FlowConfig) -> Crew:
     """Converte FlowConfig em CrewAI Crew sequencial."""
     session_id = flow.session_id or "unknown-session"
+    user_id = flow.user_id or "unknown-user"
 
     ordered_nodes = topological_sort(flow.nodes, [(e.source, e.target) for e in flow.edges])
 
@@ -243,7 +288,7 @@ def build_crew_from_config(flow: FlowConfig) -> Crew:
             llm=llm,
             verbose=True,
             allow_delegation=allow_delegation,
-            step_callback=_make_step_callback(session_id, node),
+            step_callback=_make_step_callback(session_id, user_id, node),
         )
         agent_by_id[node.id] = agent
 
@@ -261,7 +306,7 @@ def build_crew_from_config(flow: FlowConfig) -> Crew:
             callback=_make_task_callback(session_id, node),
         )
 
-        _wrap_task_execution(task, session_id, node)
+        _wrap_task_execution(task, session_id, user_id, node)
         task_by_id[node.id] = task
 
     tasks = [task_by_id[n.id] for n in ordered_nodes]
