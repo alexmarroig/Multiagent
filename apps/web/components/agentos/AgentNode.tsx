@@ -42,7 +42,7 @@ function AgentNode({ selected, data }: Props) {
       </div>
 
       <div className="space-y-3 p-4 text-[11px] font-light text-neutral-400">
-        <p className="line-clamp-2 italic">"{data.description}"</p>
+        <p className="line-clamp-2 italic">&quot;{data.description}&quot;</p>
 
         <div className="grid grid-cols-2 gap-2 pt-2">
           <div className="bg-white/5 p-1.5 border border-white/5">

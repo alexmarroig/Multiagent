@@ -137,7 +137,6 @@ export default function AgentCanvas() {
           onConnect={onConnect}
           onNodeClick={(_, node) => selectNode(node.id)}
           onPaneClick={() => selectNode(null)}
-          colorMode="dark"
         >
           <MiniMap
             zoomable
