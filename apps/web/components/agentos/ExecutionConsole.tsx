@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { downloadArtifactExcel, downloadExcel } from '@/lib/api';
 import type { AgentEvent, EventType } from '@/hooks/useAgentStream';
 
@@ -16,20 +17,20 @@ type ArtifactPayload = {
   artifact_path?: string;
 };
 
-const EVENT_STYLE: Record<EventType, { icon: string; badge: string; bg: string }> = {
-  thinking: { icon: '🧠', badge: 'bg-amber-500/20 text-amber-300', bg: 'bg-amber-900/20' },
-  action: { icon: '⚡', badge: 'bg-blue-500/20 text-blue-300', bg: 'bg-blue-900/20' },
-  tool_call: { icon: '🔧', badge: 'bg-orange-500/20 text-orange-300', bg: 'bg-orange-900/20' },
-  result: { icon: '✅', badge: 'bg-emerald-500/20 text-emerald-300', bg: 'bg-emerald-900/20' },
-  error: { icon: '❌', badge: 'bg-red-500/20 text-red-300', bg: 'bg-red-900/20' },
-  done: { icon: '🎉', badge: 'bg-white/20 text-white', bg: 'bg-slate-700/40' },
+const EVENT_STYLE: Record<EventType, { icon: string; color: string; bg: string }> = {
+  thinking: { icon: '[THINK]', color: 'text-amber-400', bg: 'bg-amber-400/5' },
+  action: { icon: '[EXEC ]', color: 'text-cyber-cyan', bg: 'bg-cyber-cyan/5' },
+  tool_call: { icon: '[TOOL ]', color: 'text-cyber-magenta', bg: 'bg-cyber-magenta/5' },
+  result: { icon: '[RES  ]', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+  error: { icon: '[FAIL ]', color: 'text-red-400', bg: 'bg-red-400/10' },
+  done: { icon: '[DONE ]', color: 'text-white', bg: 'bg-white/10' },
 };
 
 function relativeTime(isoDate: string): string {
   const diff = Math.max(0, Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000));
-  if (diff < 60) return `há ${diff}s`;
+  if (diff < 60) return `${diff}s`;
   const minutes = Math.floor(diff / 60);
-  return `há ${minutes}min`;
+  return `${minutes}m`;
 }
 
 function parseArtifactEvent(event: AgentEvent): ArtifactPayload | null {
@@ -100,51 +101,70 @@ export default function ExecutionConsole({ events, isConnected, isDone, error }:
   };
 
   return (
-    <section className="h-72 border-t border-slate-700 bg-slate-950 p-3 font-mono text-xs text-green-300">
-      <div className="mb-2 flex items-center justify-between border-b border-slate-700 pb-2">
-        <div className="flex items-center gap-2">
-          <p className="font-semibold uppercase text-slate-300">Execution Console</p>
-          {isConnected && <span className="animate-pulse text-emerald-400">● Executando</span>}
-          {!isConnected && isDone && !error && <span className="text-emerald-400">✓ Concluído</span>}
-          {error && <span className="text-red-400">✗ Erro</span>}
+    <motion.section
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="h-72 border-t border-white/10 bg-black/60 backdrop-blur-md p-3 font-mono text-[10px]"
+    >
+      <div className="mb-2 flex items-center justify-between border-b border-white/5 pb-2">
+        <div className="flex items-center gap-4">
+          <p className="font-black uppercase tracking-widest text-white/40">SYSTEM_LOG_CORE</p>
+          <div className="flex items-center gap-2">
+            {isConnected && (
+              <span className="flex items-center gap-1.5 text-cyber-cyan">
+                <span className="h-1 w-1 rounded-full bg-cyber-cyan animate-pulse" />
+                STREAMING_ACTIVE
+              </span>
+            )}
+            {!isConnected && isDone && !error && (
+              <span className="text-emerald-400">SESSION_TERMINATED_SUCCESSFULLY</span>
+            )}
+            {error && <span className="text-red-400">CRITICAL_SYSTEM_ERROR</span>}
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setHiddenUntil(Date.now())} className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600">
-            Limpar
+          <button type="button" onClick={() => setHiddenUntil(Date.now())} className="btn-cyber-outline !px-2 !py-1 !text-[9px] !border-white/10 hover:!border-white/30 text-white/50">
+            CLEAR
           </button>
-          <button type="button" onClick={copyAll} className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600">
-            Copiar tudo
+          <button type="button" onClick={copyAll} className="btn-cyber-outline !px-2 !py-1 !text-[9px] !border-white/10 hover:!border-white/30 text-white/50">
+            COPY_LOG
           </button>
           {excelMentioned && (
-            <button type="button" onClick={downloadExcelFromResult} className="rounded bg-emerald-700 px-2 py-1 text-white hover:bg-emerald-600">
-              Download Excel
+            <button type="button" onClick={downloadExcelFromResult} className="btn-cyber-primary !px-3 !py-1 !text-[9px] !bg-emerald-500 !text-black">
+              EXPORT_XLSX
             </button>
           )}
         </div>
       </div>
 
-      <div ref={listRef} className="h-56 space-y-2 overflow-auto pr-2">
-        {visibleEvents.map((event, index) => {
-          const style = EVENT_STYLE[event.event_type];
-          return (
-            <article key={`${event.timestamp}-${index}`} className={`rounded-md p-2 ${style.bg}`}>
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span>{style.icon}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] uppercase ${style.badge}`}>
-                    {event.event_type}
-                  </span>
-                  <strong className="text-slate-100">{event.agent_name}</strong>
+      <div ref={listRef} className="h-56 overflow-auto pr-2 custom-scrollbar">
+        <AnimatePresence initial={false}>
+          {visibleEvents.map((event, index) => {
+            const style = EVENT_STYLE[event.event_type];
+            return (
+              <motion.article
+                key={`${event.timestamp}-${index}`}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className={`mb-1 p-2 border-l border-white/5 ${style.bg} hover:bg-white/[0.05] transition-colors group`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className={`font-bold shrink-0 ${style.color}`}>{style.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-white font-bold">{event.agent_name}</span>
+                      <span className="text-[8px] text-neutral-600">@ {relativeTime(event.timestamp)}</span>
+                    </div>
+                    <p className={`whitespace-pre-wrap leading-relaxed ${event.event_type === 'result' ? 'text-emerald-300 font-bold' : 'text-neutral-400'}`}>
+                      {event.content}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[10px] text-slate-400">{relativeTime(event.timestamp)}</span>
-              </div>
-              <p className={`whitespace-pre-wrap text-xs ${event.event_type === 'result' ? 'font-semibold text-emerald-200' : 'text-slate-200'}`}>
-                {event.content}
-              </p>
-            </article>
-          );
-        })}
+              </motion.article>
+            );
+          })}
+        </AnimatePresence>
       </div>
-    </section>
+    </motion.section>
   );
 }

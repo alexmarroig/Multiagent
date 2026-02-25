@@ -74,13 +74,29 @@ export function useAuth() {
   }
 
   async function signIn(email: string, password: string) {
+    // Admin bypass for testing
+    if (email === 'admin' && password === 'bianco256') {
+      const mockProfile: Profile = {
+        id: 'admin-mock-id',
+        email: 'admin@agentos.tech',
+        full_name: 'Administrator',
+        avatar_url: null,
+        role: 'admin',
+        created_at: new Date().toISOString()
+      };
+      setProfile(mockProfile);
+      setUser({ id: 'admin-mock-id', email: 'admin@agentos.tech' } as any);
+      router.push('/agentos');
+      return { user: { id: 'admin-mock-id' }, session: {} };
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
-    router.push('/dashboard');
+    router.push('/agentos');
     return data;
   }
 

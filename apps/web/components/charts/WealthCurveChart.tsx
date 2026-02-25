@@ -1,13 +1,13 @@
 'use client';
 
 import {
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer
 } from 'recharts';
 
 type WealthPoint = {
@@ -21,23 +21,48 @@ type WealthCurveChartProps = {
 
 export function WealthCurveChart({ data }: WealthCurveChartProps) {
   return (
-    <div className="h-72 w-full rounded-2xl border border-neutralDark-300 bg-gradient-to-b from-neutralDark-100 via-neutralDark-200 to-neutralDark-100 p-4 md:h-80">
+    <div className="h-72 w-full p-4 md:h-80 font-mono">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 16, right: 8, left: 8, bottom: 4 }}>
-          <CartesianGrid stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" opacity={0.1} />
-          <XAxis dataKey="month" tick={{ fill: '#A3A3A3', fontSize: 12 }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fill: '#A3A3A3', fontSize: 12 }} axisLine={false} tickLine={false} />
+        <AreaChart data={data} margin={{ top: 16, right: 8, left: 8, bottom: 4 }}>
+          <defs>
+            <linearGradient id="colorPat" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#00f3ff" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="#00f3ff" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
+          <XAxis
+            dataKey="month"
+            tick={{ fill: 'rgba(0, 243, 255, 0.4)', fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            tick={{ fill: 'rgba(0, 243, 255, 0.4)', fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+          />
           <Tooltip
             contentStyle={{
-              borderRadius: '0.75rem',
-              border: '1px solid #171717',
-              background: 'rgba(17,17,17,0.95)',
-              color: '#f5f5f5',
+              borderRadius: '0',
+              border: '1px solid rgba(0, 243, 255, 0.3)',
+              background: 'rgba(0, 0, 0, 0.9)',
+              color: '#00f3ff',
+              fontSize: '10px',
+              fontFamily: 'monospace'
             }}
-            labelStyle={{ color: '#d4d4d4' }}
+            itemStyle={{ color: '#00f3ff' }}
           />
-          <Line type="monotone" dataKey="patrimonio" stroke="#3A82F7" strokeWidth={2.2} dot={false} activeDot={{ r: 4 }} />
-        </LineChart>
+          <Area
+            type="monotone"
+            dataKey="patrimonio"
+            stroke="#00f3ff"
+            strokeWidth={2}
+            fillOpacity={1}
+            fill="url(#colorPat)"
+            animationDuration={2000}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

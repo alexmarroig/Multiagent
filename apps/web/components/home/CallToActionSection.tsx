@@ -1,31 +1,70 @@
+'use client';
+
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 export function CallToActionSection() {
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 py-20">
+    <section className="relative mx-auto w-full max-w-7xl px-6 py-24">
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.35 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="rounded-2xl border border-neutralDark-300 bg-gradient-to-b from-neutralDark-100 via-neutralDark-200 to-neutralDark-100 p-10 text-center shadow-md"
+        initial={{ opacity: 0, scale: 0.95 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        className="relative overflow-hidden rounded-none border border-cyber-cyan/30 bg-black p-12 text-center md:p-20"
       >
-        <h2 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">
-          A próxima decisão financeira pode ser a mais precisa da sua operação.
-        </h2>
-        <p className="mx-auto mt-4 max-w-3xl text-lg font-medium text-neutral-300">
-          Entre no padrão AgentOS e transforme leitura de risco em vantagem competitiva.
-        </p>
-        <Link
-          href="/signup"
-          aria-label="Começar agora"
-          className="mt-8 inline-flex rounded-xl bg-gradient-to-r from-primary via-blue-500 to-violet-500 px-8 py-3 text-sm font-semibold text-white shadow-md shadow-primary/30 transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-lg"
-          style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 24px rgba(58,130,247,0.35)' }}
-        >
-          Começar agora
-        </Link>
+        {/* Animated Scanner Background */}
+        <motion.div
+          animate={{ translateY: ['-100%', '100%'] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-x-0 h-1/2 bg-gradient-to-b from-transparent via-cyber-cyan/10 to-transparent pointer-events-none"
+        />
+
+        <div className="relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            className="mb-6 flex justify-center"
+          >
+            <span className="rounded-full border border-cyber-cyan/50 px-4 py-1 font-mono text-[10px] uppercase tracking-widest text-cyber-cyan">
+              Protocolo de Acesso: Ativo
+            </span>
+          </motion.div>
+
+          <h2 className="title-cyber !text-4xl md:!text-6xl mb-6">
+            Pronto para o <span className="text-white">Futuro Autônomo?</span>
+          </h2>
+
+          <p className="mx-auto max-w-2xl text-lg font-light leading-relaxed text-neutral-400">
+            A próxima decisão pode ser a mais precisa da sua operação.
+            Entre no ecossistema AgentOS e escale sua inteligência.
+          </p>
+
+          <div className="mt-12 flex flex-col items-center justify-center gap-6 sm:flex-row">
+            <Link
+              href="/signup"
+              className="btn-cyber-primary px-12 py-4 text-base"
+            >
+              INICIALIZAR_CONEXÃO
+            </Link>
+            <Link
+              href="/login"
+              className="btn-cyber-outline !text-white !border-white/20 hover:!border-cyber-cyan px-12 py-4 text-base"
+            >
+              VISUALIZAR_DEMO
+            </Link>
+          </div>
+        </div>
+
+        {/* Decorative corner pieces */}
+        <div className="absolute top-0 left-0 h-8 w-8 border-t-2 border-l-2 border-cyber-cyan" />
+        <div className="absolute top-0 right-0 h-8 w-8 border-t-2 border-r-2 border-cyber-cyan" />
+        <div className="absolute bottom-0 left-0 h-8 w-8 border-b-2 border-l-2 border-cyber-cyan" />
+        <div className="absolute bottom-0 right-0 h-8 w-8 border-b-2 border-r-2 border-cyber-cyan" />
       </motion.div>
+
+      <div className="mt-12 text-center font-mono text-[10px] text-neutral-600 tracking-widest">
+        SECURE_ENCRYPTION_AES_256 // END_TO_END_SYNC // AGENT_OS_CORE
+      </div>
     </section>
   );
 }

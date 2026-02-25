@@ -31,13 +31,13 @@ export type AgentTemplate = {
 };
 
 export const AGENT_COLOR: Record<AgentCategory, string> = {
-  financial: '#16a34a',
-  marketing: '#2563eb',
-  phone: '#7c3aed',
-  excel: '#eab308',
-  travel: '#f97316',
-  supervisor: '#111827',
-  utility: '#64748b',
+  financial: '#00f3ff', // Cyan
+  marketing: '#ff00ff', // Magenta
+  phone: '#0066ff',    // Blue
+  excel: '#f3ff00',    // Yellow
+  travel: '#ff8000',   // Orange
+  supervisor: '#ffffff', // White
+  utility: '#94a3b8',   // Slate
 };
 
 export const AGENT_TEMPLATES: AgentTemplate[] = [

@@ -2,44 +2,87 @@
 
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
+import { motion } from 'framer-motion';
 import { AGENT_COLOR, type AgentNodeData } from '@/types/agentos';
 import { NodeStatusBadge } from '@/components/agentos/NodeStatusBadge';
 
 type Props = NodeProps<AgentNodeData>;
 
 function AgentNode({ selected, data }: Props) {
-  const borderColor = AGENT_COLOR[data.category];
+  const accentColor = AGENT_COLOR[data.category];
+  const isRunning = data.status === 'running';
 
   return (
-    <div
-      className="relative min-w-[240px] max-w-[280px] overflow-hidden rounded-xl border bg-white shadow-md dark:bg-slate-900"
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className={`relative min-w-[240px] max-w-[280px] overflow-hidden rounded-none border-t-2 bg-black/80 backdrop-blur-md transition-all duration-300 ${
+        selected ? 'shadow-[0_0_20px_rgba(255,255,255,0.1)]' : ''
+      }`}
       style={{
-        borderColor,
-        borderWidth: selected ? 3 : 2,
+        borderTopColor: accentColor,
+        borderColor: selected ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderTopWidth: 4,
       }}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{ background: accentColor, border: 'none', borderRadius: 0, width: 8, height: 8 }}
+      />
 
-      <div className="absolute right-1 top-1 z-10">
+      <div className="absolute right-2 top-2 z-10 scale-75 origin-top-right">
         <NodeStatusBadge status={data.status ?? 'idle'} />
       </div>
 
-      <div className="rounded-t-xl px-3 py-2 text-white" style={{ backgroundColor: borderColor }}>
-        <p className="text-sm font-semibold">{data.label}</p>
+      <div className="px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+        <p className="text-[10px] font-mono tracking-widest text-neutral-500 uppercase mb-1">NODE_ID: {data.category}</p>
+        <p className="text-sm font-black text-white tracking-tight">{data.label}</p>
       </div>
 
-      <div className="space-y-2 p-3 text-xs text-slate-700 dark:text-slate-200">
-        <p>{data.description}</p>
-        <p>
-          <span className="font-semibold">Modelo:</span> {data.model}
-        </p>
-        <p className="line-clamp-2">
-          <span className="font-semibold">Prompt:</span> {data.prompt}
-        </p>
+      <div className="space-y-3 p-4 text-[11px] font-light text-neutral-400">
+        <p className="line-clamp-2 italic">&quot;{data.description}&quot;</p>
+
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="bg-white/5 p-1.5 border border-white/5">
+            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">Engine</span>
+            <span className="text-white font-mono">{data.model.split('/')[1] || data.model}</span>
+          </div>
+          <div className="bg-white/5 p-1.5 border border-white/5">
+            <span className="block text-[8px] text-neutral-600 font-bold uppercase mb-0.5">Priority</span>
+            <span className="text-white font-mono">HIGH</span>
+          </div>
+        </div>
+
+        {isRunning && (
+          <div className="mt-2">
+            <div className="flex justify-between text-[8px] text-cyber-cyan mb-1">
+              <span>PROCESSING</span>
+              <span className="animate-pulse">ACTIVE_STREAM</span>
+            </div>
+            <div className="h-1 w-full bg-white/5 overflow-hidden">
+              <motion.div
+                animate={{ x: ['-100%', '100%'] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                className="h-full w-1/3 bg-cyber-cyan"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      <Handle type="source" position={Position.Right} />
-    </div>
+      {/* Decorative corner accents */}
+      <div className="absolute bottom-0 right-0 h-4 w-4">
+        <div className="absolute bottom-1 right-1 h-1 w-1 bg-white/20" />
+      </div>
+
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{ background: accentColor, border: 'none', borderRadius: 0, width: 8, height: 8 }}
+      />
+    </motion.div>
   );
 }
 

@@ -1,68 +1,136 @@
+'use client';
+
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
-const sectionAnimation = {
-  initial: { opacity: 0, y: 20 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.35 },
-  transition: { duration: 0.5, ease: 'easeOut' },
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.3,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 40, filter: 'blur(10px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { duration: 0.8, ease: [0.2, 0.65, 0.3, 0.9] }
+  },
 };
 
 export function HeroSection() {
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 py-16 md:py-24">
-      <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-        <motion.div {...sectionAnimation}>
-          <p className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-medium text-blue-100">
-            AgentOS Enterprise Financial Intelligence
-          </p>
-          <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            Infraestrutura financeira com visão institucional e execução inteligente.
-          </h1>
-          <p className="mt-5 text-lg font-medium text-neutral-300">
-            Mercado, risco e patrimônio em uma experiência única, construída para decisões de alto impacto.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-4">
-            <Link
-              href="/signup"
-              aria-label="Começar agora no AgentOS"
-              className="rounded-xl bg-gradient-to-r from-primary to-violet-500 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-primary/30 transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-lg"
+    <section className="relative overflow-hidden py-24 md:py-32 min-h-[90vh] flex items-center">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="container relative z-10 mx-auto px-6"
+      >
+        <div className="content-center">
+          <motion.div
+            variants={itemVariants}
+            className="mb-8 inline-block rounded-none border border-cyber-cyan/30 bg-cyber-cyan/5 px-4 py-1 font-mono text-[10px] uppercase tracking-[0.3em] text-cyber-cyan neon-border-cyan"
+          >
+            <motion.span
+              animate={{ opacity: [1, 0, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="mr-2"
             >
-              Começar agora
-            </Link>
-            <Link
-              href="/login"
-              aria-label="Acessar plataforma"
-              className="rounded-xl border border-neutralDark-300 bg-neutralDark-200 px-6 py-3 text-sm font-semibold text-neutral-100 transition-all duration-300 ease-out hover:scale-[1.02] hover:border-primary"
-            >
-              Ver plataforma
-            </Link>
-          </div>
-        </motion.div>
+              ●
+            </motion.span>
+            System initialized: Agent_OS v4.0.1
+          </motion.div>
 
-        <motion.div
-          {...sectionAnimation}
-          transition={{ ...sectionAnimation.transition, delay: 0.1 }}
-          className="rounded-2xl border border-neutralDark-300 bg-gradient-to-b from-neutralDark-100 via-neutralDark-200 to-neutralDark-100 p-6 shadow-md"
-        >
-          <p className="text-sm font-medium text-neutral-300">Cockpit institucional</p>
-          <p className="mt-3 text-sm text-neutral-400">
-            Painel com leitura de retorno, proteção e exposição em tempo real para operação patrimonial.
-          </p>
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <motion.h1
+            variants={itemVariants}
+            whileHover={{ skewX: -2 }}
+            className="title-cyber leading-[1.1] mb-6 cursor-default group"
+          >
+            A Próxima Evolução da <br />
+            <span className="text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] group-hover:neon-text-cyan transition-all">Inteligência Autônoma</span>
+          </motion.h1>
+
+          <motion.p
+            variants={itemVariants}
+            className="mb-12 max-w-2xl text-lg font-light leading-relaxed text-neutral-400 md:text-xl"
+          >
+            Construa, implante e dimensione frotas de agentes IA com infraestrutura
+            de nível militar. Decisões complexas em milissegundos.
+          </motion.p>
+
+          <motion.div
+            variants={itemVariants}
+            className="flex flex-wrap justify-center gap-6"
+          >
+            <Link href="/signup" className="btn-cyber-primary group relative overflow-hidden">
+              <span className="relative z-10">INICIALIZAR_PROTOCOLO</span>
+              <motion.div
+                className="absolute inset-0 bg-white/20 translate-x-[-100%]"
+                whileHover={{ translateX: '100%' }}
+                transition={{ duration: 0.5 }}
+              />
+            </Link>
+            <Link href="/login" className="btn-cyber-outline !text-cyber-magenta !border-cyber-magenta hover:!bg-cyber-magenta/10">
+              ACESSAR_TERMINAL
+            </Link>
+          </motion.div>
+
+          <motion.div
+            variants={containerVariants}
+            className="mt-20 grid w-full max-w-5xl grid-cols-1 gap-8 md:grid-cols-3"
+          >
             {[
-              ['Retorno', '+18.4%'],
-              ['Risco', '73/100'],
-              ['Alertas', '34'],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-neutralDark-300 bg-neutralDark-200 p-4 transition-all duration-300 ease-out hover:scale-[1.02]">
-                <p className="text-xs text-neutral-400">{label}</p>
-                <p className="mt-2 text-xl font-bold text-white">{value}</p>
-              </div>
+              { label: 'Uptime do Sistema', value: '99.999%', detail: 'REDE NEURAL ATIVA', color: 'cyber-cyan' },
+              { label: 'Latência Global', value: '< 12ms', detail: 'BAIXA RESPOSTA', color: 'cyber-magenta' },
+              { label: 'Agentes Ativos', value: '1.2M+', detail: 'PROCESSAMENTO SYNC', color: 'cyber-yellow' },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                variants={itemVariants}
+                whileHover={{ scale: 1.05, translateY: -5 }}
+                className="glass-panel p-6 text-left border-l-2 border-l-cyber-cyan group cursor-crosshair"
+              >
+                <p className="font-mono text-[10px] uppercase tracking-widest text-cyber-cyan/60 group-hover:text-cyber-cyan transition-colors">{stat.label}</p>
+                <p className="mt-2 text-3xl font-black text-white">{stat.value}</p>
+                <div className="mt-4 h-1 w-full bg-white/5 overflow-hidden">
+                   <motion.div
+                     initial={{ width: 0 }}
+                     whileInView={{ width: '70%' }}
+                     transition={{ delay: 0.5 + (i * 0.1), duration: 1 }}
+                     className="h-full bg-cyber-cyan shadow-[0_0_10px_#00f3ff]"
+                   />
+                </div>
+                <p className="mt-2 font-mono text-[8px] text-cyber-cyan/40">{stat.detail}</p>
+              </motion.div>
             ))}
-          </div>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      {/* Background Decorative Elements */}
+      <motion.div
+        animate={{
+          scale: [1, 1.2, 1],
+          opacity: [0.1, 0.15, 0.1]
+        }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-1/4 left-0 -translate-x-1/2 w-[500px] h-[500px] bg-cyber-cyan/20 rounded-full blur-[120px] pointer-events-none"
+      />
+      <motion.div
+        animate={{
+          scale: [1.2, 1, 1.2],
+          opacity: [0.1, 0.15, 0.1]
+        }}
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-1/4 right-0 translate-x-1/2 w-[500px] h-[500px] bg-cyber-magenta/20 rounded-full blur-[120px] pointer-events-none"
+      />
     </section>
   );
 }

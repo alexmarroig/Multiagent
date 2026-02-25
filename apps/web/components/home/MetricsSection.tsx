@@ -1,47 +1,80 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import { MetricCard } from './MetricCard';
 
 const metrics = [
   {
-    title: 'Retorno anualizado',
+    title: 'RETORNO_ALPHA',
     value: '18.42%',
-    description: 'Performance consolidada em múltiplas estratégias.',
+    description: 'Performance consolidada em múltiplas estratégias neurais.',
   },
   {
-    title: 'Risco monitorado',
-    value: '73/100',
+    title: 'RISK_INDEX',
+    value: '0.24',
     description: 'Cobertura quantitativa ativa para eventos de mercado.',
   },
   {
-    title: 'Objetivos ativos',
-    value: '12',
-    description: 'Planos patrimoniais com acompanhamento contínuo.',
+    title: 'ACTIVE_AGENTS',
+    value: '1,284',
+    description: 'Frotas de agentes operando em sincronia global.',
   },
   {
-    title: 'Alertas críticos',
-    value: '34',
-    description: 'Sinais priorizados para ação imediata do time.',
+    title: 'SIGNAL_PRIORITY',
+    value: 'ULTRA',
+    description: 'Sinais priorizados para execução em milissegundos.',
   },
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: 'spring', damping: 15 }
+  },
+};
+
 export function MetricsSection() {
   return (
-    <section id="metricas" className="mx-auto w-full max-w-7xl px-6 py-16">
+    <section id="metricas" className="relative mx-auto w-full max-w-7xl px-6 py-24">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.35 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
+        initial={{ opacity: 0, x: -20 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+        className="mb-16"
       >
-        <h2 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">Métricas estratégicas</h2>
-        <p className="mt-3 text-lg font-medium text-neutral-300">Indicadores de performance e risco para decisões com confiança.</p>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="h-1 w-1 bg-cyber-magenta" />
+          <span className="font-mono text-[10px] tracking-widest text-cyber-magenta uppercase">SYSTEM_KPIs</span>
+        </div>
+        <h2 className="title-cyber !text-4xl md:!text-5xl">Métricas de <span className="text-white">Operação</span></h2>
       </motion.div>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true }}
+        className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4"
+      >
         {metrics.map((metric) => (
-          <MetricCard key={metric.title} {...metric} />
+          <motion.div key={metric.title} variants={itemVariants}>
+            <MetricCard {...metric} />
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </section>
   );
 }

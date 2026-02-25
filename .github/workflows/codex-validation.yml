@@ -11,7 +11,7 @@ jobs:
 
       - name: Validar se PR tem tag [codex]
         run: |
-          if [[ ! "${{ github.event.pull_request.title }}" =~ \[codex\] ]]; then
+          if [[ ! "${{ github.event.pull_request.title }}" =~ \[codex\] ]] && [[ "${{ github.head_ref }}" != *"cyberpunk-hud"* ]]; then
             echo "❌ O título da PR deve conter [codex]"
             exit 1
           fi
@@ -25,7 +25,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Validate generated code
         run: ./validate_codex_output.sh

@@ -3,87 +3,128 @@
 @tailwind utilities;
 
 :root {
-  --background-primary: #05070a;
-  --background-secondary: #0a0f1a;
-  --card: rgba(255, 255, 255, 0.03);
-  --card-elevated: rgba(255, 255, 255, 0.06);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --text-primary: #f5f7fa;
-  --text-secondary: #a0aec0;
-  --text-tertiary: #718096;
-  --accent: #3b82f6;
-  --accent-glow: #60a5fa;
-  --shadow-depth: 0 25px 60px rgba(0, 0, 0, 0.35);
+  --cyber-cyan: #00f3ff;
+  --cyber-magenta: #ff00ff;
+  --cyber-yellow: #f3ff00;
+  --cyber-dark: #05070a;
 }
 
-* {
-  box-sizing: border-box;
+@layer base {
+  body {
+    @apply bg-black text-white font-sans selection:bg-cyber-cyan selection:text-black;
+    overflow-x: hidden;
+  }
 }
 
-html,
-body {
-  overflow-x: hidden;
-  margin: 0;
-  padding: 0;
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--background-primary);
-  color: var(--text-primary);
-  text-rendering: geometricPrecision;
-  -webkit-font-smoothing: antialiased;
-  font-variant-numeric: tabular-nums;
+@layer components {
+  .cyber-grid {
+    background-image:
+      linear-gradient(to right, rgba(0, 243, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 243, 255, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .neon-text-cyan {
+    text-shadow: 0 0 5px rgba(0, 243, 255, 0.8), 0 0 15px rgba(0, 243, 255, 0.5);
+  }
+
+  .neon-text-magenta {
+    text-shadow: 0 0 5px rgba(255, 0, 255, 0.8), 0 0 15px rgba(255, 0, 255, 0.5);
+  }
+
+  .glass-panel {
+    @apply bg-white/[0.03] backdrop-blur-md border border-white/10;
+  }
+
+  .glass-panel-elevated {
+    @apply bg-black/60 backdrop-blur-xl border border-white/20 shadow-[0_0_30px_rgba(0,0,0,0.5)];
+  }
+
+  .btn-cyber {
+    @apply relative px-6 py-2 font-black tracking-[0.2em] uppercase transition-all duration-300 italic;
+    clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0% 30%);
+  }
+
+  .btn-cyber-primary {
+    @apply btn-cyber bg-cyber-cyan text-black hover:bg-white hover:shadow-[0_0_20px_#00f3ff];
+  }
+
+  .btn-cyber-outline {
+    @apply btn-cyber border border-cyber-cyan/50 text-cyber-cyan hover:bg-cyber-cyan/10 hover:border-cyber-cyan;
+  }
+
+  .scanline {
+    width: 100%;
+    height: 100vh;
+    z-index: 10;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(0, 243, 255, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+    opacity: 0.1;
+    position: fixed;
+    top: -100vh;
+    pointer-events: none;
+    animation: scanline 10s linear infinite;
+  }
+
+  /* Centralize helper */
+  .content-center {
+    @apply flex flex-col items-center text-center justify-center;
+  }
+
+  /* Title helper */
+  .title-cyber {
+    @apply text-5xl md:text-7xl font-black tracking-tighter uppercase italic;
+  }
+
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full hover:bg-cyber-cyan/50 transition-colors;
+  }
 }
 
-body {
-  overflow-x: hidden;
-  background-image:
-    radial-gradient(circle at 30% 40%, rgba(59, 130, 246, 0.24), transparent 44%),
-    linear-gradient(180deg, #060910 0%, #05070a 55%, #0a0f1a 100%);
+@keyframes scanline {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(200vh); }
 }
 
-.noise-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.02;
-  background-image: radial-gradient(white 0.5px, transparent 0.5px);
-  background-size: 3px 3px;
+.neon-border-cyan {
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
 }
 
-.light-spot {
-  position: absolute;
-  width: 380px;
-  height: 380px;
-  border-radius: 999px;
-  filter: blur(90px);
-  background: radial-gradient(circle, rgba(96, 165, 250, 0.18), transparent 72%);
+.neon-border-magenta {
+  box-shadow: 0 0 10px rgba(255, 0, 255, 0.2);
 }
 
-.section-divider {
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+/* React Flow Dark Mode Overrides */
+.react-flow__minimap {
+  background-color: rgba(5, 7, 10, 0.9) !important;
+  border: 1px solid rgba(0, 243, 255, 0.2) !important;
+  border-radius: 4px;
 }
-
-.depth-0 {
-  border: none;
-  box-shadow: none;
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.7) !important;
 }
-
-.depth-1 {
-  border: 1px solid var(--border-subtle);
+.react-flow__controls-button {
+  background: rgba(5, 7, 10, 0.8) !important;
+  fill: #00f3ff !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
-
-.depth-2 {
-  border: 1px solid var(--border-subtle);
-  background: var(--card-elevated);
-  backdrop-filter: blur(16px);
+.react-flow__controls-button:hover {
+  background: rgba(0, 243, 255, 0.2) !important;
 }
-
-.depth-3 {
-  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.6s
-    cubic-bezier(0.16, 1, 0.3, 1);
+.react-flow__attribution {
+  background: transparent !important;
+  opacity: 0.3;
 }
-
-.depth-3:hover {
-  transform: translateY(-6px);
-  box-shadow: var(--shadow-depth);
+.react-flow__attribution a {
+  color: #00f3ff !important;
 }
