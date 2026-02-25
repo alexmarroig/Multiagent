@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import traceback
 import uuid
 from datetime import datetime
@@ -55,10 +54,16 @@ async def execute_flow(flow: FlowConfig) -> None:
     cancel_event = CANCEL_FLAGS.setdefault(flow.session_id, asyncio.Event())
     RUNNING_EXECUTIONS[flow.session_id] = asyncio.current_task()  # type: ignore[assignment]
 
+    degraded_state = {"redis": False, "supabase": False}
+
     async def emit(ev) -> None:
         payload = ev.model_dump(mode="json")
         event_log.append(payload)
-        await publish_event(flow.session_id, ev)
+        try:
+            await publish_event(flow.session_id, ev)
+            degraded_state["redis"] = False
+        except Exception:
+            degraded_state["redis"] = True
 
     def record_event(payload: dict[str, Any]) -> None:
         event_log.append(payload)

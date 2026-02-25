@@ -15,6 +15,7 @@ import json
 import os
 import time
 from collections import defaultdict, deque
+from contextlib import AsyncExitStack
 from typing import Any, Callable, Iterable, Mapping
 
 from crewai import Agent, Crew, Process, Task
@@ -34,6 +35,14 @@ from tools.tool_ids import normalize_tool_ids
 
 
 DEFAULT_TEMPERATURE = 0.2
+DEFAULT_GRAPH_WORKERS = int(os.getenv("ORCHESTRATOR_GRAPH_WORKERS", "8"))
+DEFAULT_TENANT_CONCURRENCY = int(os.getenv("ORCHESTRATOR_TENANT_CONCURRENCY", "2"))
+DEFAULT_TOOL_CONCURRENCY = int(os.getenv("ORCHESTRATOR_TOOL_CONCURRENCY", "4"))
+DEFAULT_HEAVY_TOOL_WORKERS = int(os.getenv("ORCHESTRATOR_HEAVY_TOOL_WORKERS", "2"))
+BACKPRESSURE_BASE_SECONDS = float(os.getenv("ORCHESTRATOR_BACKPRESSURE_BASE_SECONDS", "0.5"))
+BACKPRESSURE_MAX_SECONDS = float(os.getenv("ORCHESTRATOR_BACKPRESSURE_MAX_SECONDS", "8"))
+
+HEAVY_TOOLS = {"browser", "excel"}
 TRANSIENT_ERROR_HINTS = (
     "timeout",
     "timed out",
@@ -71,6 +80,63 @@ TOOL_REGISTRY: Mapping[str, Any] = {
     "browser": browse_website,
     "travel": search_hotels,
 }
+
+
+class _ExecutionQueue:
+    """Coordena concorrência por tenant, por tipo de ferramenta e worker pool pesado."""
+
+    def __init__(self) -> None:
+        self._tenant_limit = max(1, DEFAULT_TENANT_CONCURRENCY)
+        self._default_tool_limit = max(1, DEFAULT_TOOL_CONCURRENCY)
+        self._heavy_pool = asyncio.Semaphore(max(1, DEFAULT_HEAVY_TOOL_WORKERS))
+        self._tenant_semaphores: dict[str, asyncio.Semaphore] = {}
+        self._tool_semaphores: dict[str, asyncio.Semaphore] = {}
+        self._lock = asyncio.Lock()
+
+    async def _tenant_semaphore(self, tenant_id: str) -> asyncio.Semaphore:
+        async with self._lock:
+            sem = self._tenant_semaphores.get(tenant_id)
+            if sem is None:
+                sem = asyncio.Semaphore(self._tenant_limit)
+                self._tenant_semaphores[tenant_id] = sem
+            return sem
+
+    async def _tool_semaphore(self, tool_name: str) -> asyncio.Semaphore:
+        async with self._lock:
+            sem = self._tool_semaphores.get(tool_name)
+            if sem is None:
+                limit = int(os.getenv(f"ORCHESTRATOR_TOOL_{tool_name.upper()}_CONCURRENCY", str(self._default_tool_limit)))
+                sem = asyncio.Semaphore(max(1, limit))
+                self._tool_semaphores[tool_name] = sem
+            return sem
+
+    async def acquire(self, tenant_id: str, tools: set[str]) -> AsyncExitStack:
+        stack = AsyncExitStack()
+        tenant_sem = await self._tenant_semaphore(tenant_id)
+        await stack.enter_async_context(_SemaphoreLease(tenant_sem))
+
+        for tool in sorted(tools):
+            tool_sem = await self._tool_semaphore(tool)
+            await stack.enter_async_context(_SemaphoreLease(tool_sem))
+
+        if tools & HEAVY_TOOLS:
+            await stack.enter_async_context(_SemaphoreLease(self._heavy_pool))
+        return stack
+
+
+class _SemaphoreLease:
+    def __init__(self, semaphore: asyncio.Semaphore) -> None:
+        self._semaphore = semaphore
+
+    async def __aenter__(self) -> "_SemaphoreLease":
+        await self._semaphore.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        self._semaphore.release()
+
+
+EXECUTION_QUEUE = _ExecutionQueue()
 
 
 def _publish_event_sync(
@@ -413,6 +479,165 @@ def topological_sort(nodes: list[NodeConfig], edges: list[tuple[str, str]]) -> l
     return [node_map[nid] for nid in ordered_ids]
 
 
+def _node_tool_types(node: NodeConfig) -> set[str]:
+    normalized, _meta = normalize_tool_ids(node.tools)
+    return {tool for tool in normalized if tool in TOOL_REGISTRY}
+
+
+async def _apply_backpressure(
+    flow: FlowConfig,
+    health_check: Callable[[], bool] | None,
+    attempts: int,
+) -> int:
+    """Reduz ritmo quando Redis/Supabase reportarem degradação."""
+    if health_check is None:
+        return attempts
+
+    if not health_check():
+        return 0
+
+    delay = min(BACKPRESSURE_BASE_SECONDS * (2**attempts), BACKPRESSURE_MAX_SECONDS)
+    _publish_event_sync(
+        session_id=flow.session_id or "unknown-session",
+        agent_id="system",
+        agent_name="AgentOS",
+        event_type="warning",
+        content={
+            "message": "Backpressure ativo: Redis/Supabase degradados, desacelerando execução.",
+            "delay_seconds": delay,
+        },
+    )
+    await asyncio.sleep(delay)
+    return attempts + 1
+
+
+def _create_node_task(
+    node: NodeConfig,
+    predecessors: list[str],
+    predecessor_outputs: dict[str, Any],
+    session_id: str,
+    flow_inputs: dict[str, Any],
+) -> Task:
+    prompt = node.system_prompt or DEFAULT_PROMPTS.get(node.agent_type, "")
+    llm = _build_llm(node.provider, node.model)
+    tools = _resolve_tools(node.tools)
+
+    agent = Agent(
+        role=node.label,
+        goal=f"Executar tarefas do agente {node.label} com qualidade.",
+        backstory=prompt,
+        tools=tools,
+        llm=llm,
+        verbose=True,
+        allow_delegation=node.agent_type == AgentType.supervisor,
+        step_callback=_make_step_callback(session_id, node),
+    )
+
+    pred_context = {pid: predecessor_outputs.get(pid) for pid in predecessors if pid in predecessor_outputs}
+    context_prefix = (
+        f"Resultados de predecessores: {pred_context}."
+        if pred_context
+        else "Sem resultados de predecessores."
+    )
+
+    task = Task(
+        description=(
+            f"Você é {node.label}. Execute sua etapa dentro do fluxo com base nos inputs: "
+            f"{flow_inputs}. {context_prefix}"
+        ),
+        expected_output=f"Saída estruturada e objetiva produzida por {node.label}.",
+        agent=agent,
+        callback=_make_task_callback(session_id, node),
+    )
+    _wrap_task_execution(task, session_id, node)
+    return task
+
+
+async def execute_flow_graph(
+    flow: FlowConfig,
+    health_check: Callable[[], bool] | None = None,
+) -> dict[str, Any]:
+    """Executa o grafo em paralelo, respeitando dependências e limites de concorrência."""
+    session_id = flow.session_id or "unknown-session"
+    tenant_id = flow.user_id or "anonymous"
+
+    nodes = {node.id: node for node in flow.nodes}
+    indegree = {node.id: 0 for node in flow.nodes}
+    successors: dict[str, list[str]] = defaultdict(list)
+    predecessors: dict[str, list[str]] = defaultdict(list)
+
+    for edge in flow.edges:
+        if edge.source not in nodes or edge.target not in nodes:
+            raise ValueError(f"Aresta inválida: {edge.source} -> {edge.target} (nó inexistente).")
+        indegree[edge.target] += 1
+        successors[edge.source].append(edge.target)
+        predecessors[edge.target].append(edge.source)
+
+    ready: asyncio.Queue[str] = asyncio.Queue()
+    for node_id, degree in indegree.items():
+        if degree == 0:
+            ready.put_nowait(node_id)
+
+    outputs: dict[str, Any] = {}
+    completed: set[str] = set()
+    state_lock = asyncio.Lock()
+    errors: list[Exception] = []
+    backpressure_attempts = 0
+
+    async def worker() -> None:
+        nonlocal backpressure_attempts
+        while True:
+            node_id = await ready.get()
+            try:
+                if node_id == "__STOP__":
+                    return
+
+                node = nodes[node_id]
+                backpressure_attempts = await _apply_backpressure(flow, health_check, backpressure_attempts)
+
+                tool_types = _node_tool_types(node)
+                async with await EXECUTION_QUEUE.acquire(tenant_id, tool_types):
+                    task = _create_node_task(
+                        node=node,
+                        predecessors=predecessors.get(node_id, []),
+                        predecessor_outputs=outputs,
+                        session_id=session_id,
+                        flow_inputs=flow.inputs,
+                    )
+                    result = await asyncio.to_thread(task.execute_sync)
+
+                async with state_lock:
+                    outputs[node_id] = getattr(result, "raw", str(result))
+                    completed.add(node_id)
+                    for nxt in successors.get(node_id, []):
+                        indegree[nxt] -= 1
+                        if indegree[nxt] == 0:
+                            ready.put_nowait(nxt)
+            except Exception as exc:
+                errors.append(exc)
+                return
+            finally:
+                ready.task_done()
+
+    worker_count = max(1, min(DEFAULT_GRAPH_WORKERS, len(flow.nodes) or 1))
+    workers = [asyncio.create_task(worker()) for _ in range(worker_count)]
+
+    await ready.join()
+
+    for _ in workers:
+        ready.put_nowait("__STOP__")
+    await ready.join()
+    await asyncio.gather(*workers, return_exceptions=True)
+
+    if errors:
+        raise errors[0]
+    if len(completed) != len(flow.nodes):
+        raise ValueError("Não foi possível concluir todos os nós. Verifique ciclos/dependências.")
+
+    return outputs
+
+
+def build_crew_from_config(flow: FlowConfig) -> Crew:
 def build_crew_from_config(
     flow: FlowConfig,
     *,
