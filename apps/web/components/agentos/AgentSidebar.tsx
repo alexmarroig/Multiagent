@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { AGENT_COLOR, AGENT_TEMPLATES, type AgentCategory } from '@/types/agentos';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 
@@ -43,23 +43,35 @@ const itemVariants = {
 export default function AgentSidebar() {
   const addNodeFromTemplate = useCanvasStore((s) => s.addNodeFromTemplate);
   const lang = useCanvasStore((s) => s.language);
+  const [search, setSearch] = useState('');
 
   const onDragStart = (event: React.DragEvent, templateId: string) => {
     event.dataTransfer.setData('application/reactflow', templateId);
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const filteredTemplates = useMemo(() => {
+    if (!search) return AGENT_TEMPLATES;
+    const low = search.toLowerCase();
+    return AGENT_TEMPLATES.filter(
+      (t) =>
+        t.name.toLowerCase().includes(low) ||
+        t.description.toLowerCase().includes(low) ||
+        t.category.toLowerCase().includes(low)
+    );
+  }, [search]);
+
   const grouped = useMemo(() => {
     const map = new Map<AgentCategory, typeof AGENT_TEMPLATES>();
 
-    AGENT_TEMPLATES.forEach((template) => {
+    filteredTemplates.forEach((template) => {
       const list = map.get(template.category) ?? [];
       list.push(template);
       map.set(template.category, list);
     });
 
     return Array.from(map.entries());
-  }, []);
+  }, [filteredTemplates]);
 
   return (
     <motion.aside
@@ -73,9 +85,20 @@ export default function AgentSidebar() {
           <div className="h-4 w-1 bg-cyber-cyan shadow-[0_0_8px_#00f3ff]" />
           <h2 className="text-sm font-black tracking-[0.2em] text-white uppercase">{lang === 'en' ? 'Neural_Library' : 'Biblioteca_Neural'}</h2>
         </div>
-        <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">
+        <p className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest mb-4">
           {lang === 'en' ? 'Select_Protocol_to_Initialize' : 'Selecione_Protocolo_para_Iniciar'}
         </p>
+
+        <div className="relative">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={lang === 'en' ? 'SEARCH_PROTOCOLS...' : 'BUSCAR_PROTOCOLOS...'}
+            className="w-full bg-white/5 border border-white/10 px-3 py-2 text-[10px] font-mono text-cyber-cyan placeholder:text-white/20 outline-none focus:border-cyber-cyan/50 transition-all rounded-sm"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 h-1 w-1 bg-cyber-cyan shadow-[0_0_4px_#00f3ff] animate-pulse" />
+        </div>
       </div>
 
       <motion.div

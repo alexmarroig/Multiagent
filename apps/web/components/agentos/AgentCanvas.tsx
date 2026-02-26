@@ -4,7 +4,7 @@ import 'reactflow/dist/style.css';
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactFlow, { Background, Controls, MiniMap, type ReactFlowInstance } from 'reactflow';
-import { AGENT_TEMPLATES } from '@/types/agentos';
+import { AGENT_COLOR, AGENT_TEMPLATES, type AgentNodeData } from '@/types/agentos';
 import AgentNode from '@/components/agentos/AgentNode';
 import ExecutionConsole from '@/components/agentos/ExecutionConsole';
 import RunModal from '@/components/agentos/RunModal';
@@ -138,6 +138,19 @@ export default function AgentCanvas() {
           >
             MISSION_TEMPLATES
           </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => {
+              if (confirm(lang === 'en' ? 'CLEAR_ALL_NODES?' : 'LIMPAR_TODOS_OS_NÓS?')) {
+                useCanvasStore.getState().onNodesChange(nodes.map(n => ({ id: n.id, type: 'remove' } as any)));
+              }
+            }}
+            className="btn-cyber-outline !px-3 !py-1.5 !text-[9px] !border-red-500/20 !text-red-400/70"
+          >
+            {lang === 'en' ? 'WIPE_CANVAS' : 'LIMPAR_CANVAS'}
+          </motion.button>
         </div>
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -180,14 +193,17 @@ export default function AgentCanvas() {
           onDrop={onDrop}
           onNodeClick={(_, node) => selectNode(node.id)}
           onPaneClick={() => selectNode(null)}
+          className="bg-dot-pattern"
         >
           <MiniMap
             zoomable
             pannable
-            nodeColor="#00f3ff"
+            nodeColor={(n) => AGENT_COLOR[(n.data as AgentNodeData).category] || '#00f3ff'}
             nodeStrokeWidth={3}
+            maskColor="rgba(0, 0, 0, 0.6)"
+            className="!bg-black/80 !border-white/10 !bottom-6 !right-6 rounded-sm shadow-2xl"
           />
-          <Controls className="!bg-black/50 !border-white/10 !fill-white" />
+          <Controls className="!bg-black/80 !border-white/10 !fill-white !left-6 !bottom-6 flex-row" />
           <Background gap={40} size={1} color="rgba(0, 243, 255, 0.05)" />
         </ReactFlow>
 

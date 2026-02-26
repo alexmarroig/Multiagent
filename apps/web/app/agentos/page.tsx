@@ -26,6 +26,12 @@ export default function AgentOSPage() {
 
   useEffect(() => {
     healthCheck().then((isOnline) => setBackendOnline(isOnline));
+
+    const hasSeenTutorial = localStorage.getItem('agentos_onboarding_seen');
+    if (!hasSeenTutorial) {
+      setShowTutorial(true);
+      localStorage.setItem('agentos_onboarding_seen', 'true');
+    }
   }, [setBackendOnline]);
 
   const t = {

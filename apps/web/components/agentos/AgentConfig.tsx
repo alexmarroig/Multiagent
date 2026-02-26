@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCanvasStore } from '@/hooks/useCanvasStore';
 
@@ -12,6 +12,7 @@ export default function AgentConfig() {
   const selectedNodeId = useCanvasStore((s) => s.selectedNodeId);
   const updateNodeData = useCanvasStore((s) => s.updateNodeData);
   const lang = useCanvasStore((s) => s.language);
+  const [activeTab, setActiveTab] = useState<'core' | 'prompt'>('core');
 
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId),
@@ -50,7 +51,7 @@ export default function AgentConfig() {
             animate={{ opacity: 1, x: 0 }}
             className="space-y-6"
           >
-            <div className="mb-6">
+            <div className="mb-4">
               <div className="flex items-center gap-2 mb-2">
                 <div className="h-4 w-1 bg-cyber-magenta shadow-[0_0_8px_#ff00ff]" />
                 <h2 className="text-sm font-black tracking-[0.2em] text-white uppercase">NODE_PARAMS</h2>
@@ -60,58 +61,99 @@ export default function AgentConfig() {
               </p>
             </div>
 
-            <div className="space-y-4">
-              <label className="block">
-                <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
-                   {lang === 'en' ? 'DESIGNATION' : 'DESIGNAÇÃO'}
-                </span>
-                <input
-                  className={inputClassName}
-                  value={selectedNode.data.label}
-                  onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value })}
-                />
-              </label>
-
-              <label className="block">
-                <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
-                   {lang === 'en' ? 'CORE_ENGINE' : 'MOTOR_PRINCIPAL'}
-                </span>
-                <input
-                  className={inputClassName}
-                  value={selectedNode.data.model}
-                  onChange={(e) => updateNodeData(selectedNode.id, { model: e.target.value })}
-                />
-              </label>
-
-              <label className="block">
-                <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
-                   {lang === 'en' ? 'DIRECTIVE_PROMPT' : 'PROMPT_DE_DIRETIVA'}
-                </span>
-                <textarea
-                  className={`${inputClassName} h-48 custom-scrollbar resize-none font-sans font-medium text-[13px] leading-relaxed p-4`}
-                  value={selectedNode.data.prompt}
-                  onChange={(e) => updateNodeData(selectedNode.id, { prompt: e.target.value })}
-                />
-              </label>
-
-              <label className="block">
-                <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
-                   {lang === 'en' ? 'EQUIPPED_TOOLS (CSV)' : 'FERRAMENTAS_EQUIPADAS (CSV)'}
-                </span>
-                <input
-                  className={inputClassName}
-                  value={selectedNode.data.tools.join(', ')}
-                  onChange={(e) =>
-                    updateNodeData(selectedNode.id, {
-                      tools: e.target.value
-                        .split(',')
-                        .map((item) => item.trim())
-                        .filter(Boolean),
-                    })
-                  }
-                />
-              </label>
+            <div className="flex border-b border-white/10 mb-6">
+              <button
+                onClick={() => setActiveTab('core')}
+                className={`flex-1 py-2 text-[10px] font-bold tracking-widest uppercase transition-all ${
+                  activeTab === 'core' ? 'text-cyber-magenta border-b-2 border-cyber-magenta' : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                {lang === 'en' ? 'CORE_SPECS' : 'ESPEC_CORE'}
+              </button>
+              <button
+                onClick={() => setActiveTab('prompt')}
+                className={`flex-1 py-2 text-[10px] font-bold tracking-widest uppercase transition-all ${
+                  activeTab === 'prompt' ? 'text-cyber-magenta border-b-2 border-cyber-magenta' : 'text-neutral-500 hover:text-neutral-300'
+                }`}
+              >
+                {lang === 'en' ? 'LOGIC_PROMPT' : 'PROMPT_LOGICA'}
+              </button>
             </div>
+
+            <AnimatePresence mode="wait">
+              {activeTab === 'core' ? (
+                <motion.div
+                  key="core"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-4"
+                >
+                  <label className="block">
+                    <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
+                       {lang === 'en' ? 'DESIGNATION' : 'DESIGNAÇÃO'}
+                    </span>
+                    <input
+                      className={inputClassName}
+                      value={selectedNode.data.label}
+                      onChange={(e) => updateNodeData(selectedNode.id, { label: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
+                       {lang === 'en' ? 'CORE_ENGINE' : 'MOTOR_PRINCIPAL'}
+                    </span>
+                    <input
+                      className={inputClassName}
+                      value={selectedNode.data.model}
+                      onChange={(e) => updateNodeData(selectedNode.id, { model: e.target.value })}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                       {lang === 'en' ? 'EQUIPPED_TOOLS (CSV)' : 'FERRAMENTAS_EQUIPADAS (CSV)'}
+                    </span>
+                    <textarea
+                      className={`${inputClassName} h-24 resize-none`}
+                      value={selectedNode.data.tools.join(', ')}
+                      onChange={(e) =>
+                        updateNodeData(selectedNode.id, {
+                          tools: e.target.value
+                            .split(',')
+                            .map((item) => item.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                    />
+                  </label>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="prompt"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  className="space-y-4"
+                >
+                  <label className="block">
+                    <span className="block text-[11px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-2">
+                       {lang === 'en' ? 'DIRECTIVE_PROMPT' : 'PROMPT_DE_DIRETIVA'}
+                    </span>
+                    <textarea
+                      className={`${inputClassName} h-[400px] custom-scrollbar resize-none font-sans font-medium text-[13px] leading-relaxed p-4`}
+                      value={selectedNode.data.prompt}
+                      onChange={(e) => updateNodeData(selectedNode.id, { prompt: e.target.value })}
+                    />
+                    <div className="mt-2 text-[9px] font-mono text-neutral-600 flex justify-between">
+                      <span>TOKENS: ~{Math.ceil(selectedNode.data.prompt.length / 4)}</span>
+                      <span>UTF-8_SYNCED</span>
+                    </div>
+                  </label>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
