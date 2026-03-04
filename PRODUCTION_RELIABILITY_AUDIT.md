@@ -1,192 +1,170 @@
 # Production Reliability & Scalability Audit
 
-## Verdict
+## Executive verdict
 
-**Current verdict: Not safe for production deployment under heavy autonomous-agent load.**
+**Verdict: Not safe for production deployment under heavy autonomous load.**
 
-The codebase has some guardrails (runtime cost cap, retries/timeouts in selected paths, semantic retrieval, and persistent memory in backend), but it lacks critical controls for queue backpressure, task explosion limits, failure isolation primitives, and crash-safe execution state.
+The platform includes early guardrails (cost ceilings, retries in selected paths, semantic retrieval, and some durable memory), but lacks essential controls required to resist runtime collapse: bounded fan-out, queue backpressure, circuit breaking, durable task checkpoints, and crash reprocessing of in-flight work.
 
-## Control-by-control classification
+---
+
+## Control classification matrix
 
 ### 1) Task explosion protection
 
-- **Task explosion protection (global cap)**: **Not implemented**
-- **Max task depth**: **Not implemented**
-- **Max retries**: **Partially implemented**
-- **Max runtime per task**: **Partially implemented**
-
-**Evidence**
-- Dynamic spawn paths exist without global cap/depth limit (`spawn_tasks`, `spawn_task`) in both autonomy loop and task graph components.
-- Retry/timeouts are present only in backend orchestrator wrappers and scheduler, not universally across all worker/task paths.
+| Control | Status | Evidence |
+|---|---|---|
+| Task explosion protection | **Partially implemented** | Loop iteration ceilings exist (`max_cycles`, `max_iterations`), but spawned tasks are not bounded globally (`spawn_task`, `spawn_tasks`) and can fan out without a hard cap. |
+| Max task depth | **Not implemented** | Task models/graph do not track depth metadata and no depth validation occurs on spawn. |
+| Max retries | **Partially implemented** | Retries exist in orchestrator task wrapper and goal scheduler, but not in core distributed worker path. |
+| Max runtime per task | **Partially implemented** | Per-task timeout exists in orchestrator wrapper (`future.result(timeout=...)`), but core worker execution lacks timeout enforcement. |
 
 ### 2) LLM cost control
 
-- **Max tokens per execution**: **Not implemented**
-- **Max API requests**: **Not implemented**
-- **Max cost budget**: **Partially implemented**
-
-**Evidence**
-- Runtime loop has max runtime cost and loop-cycle cap.
-- Backend autonomy has `max_cost` and iteration/runtime guardrails.
-- No per-call token/request quota enforcement in LLM wrappers.
+| Control | Status | Evidence |
+|---|---|---|
+| Max tokens per execution | **Not implemented** | No token accounting/enforcement in runtime/planning loops or policy checks. |
+| Max API requests | **Not implemented** | No per-run or per-session request budget across model/tool calls. |
+| Max cost budget | **Partially implemented** | Runtime cost caps exist (`AgentRuntime.max_runtime_cost`, autonomy guardrails `max_cost`), but spend is coarse-grained and not per-provider/per-request enforced. |
 
 ### 3) Context management
 
-- **Context summarization**: **Not implemented**
-- **Semantic retrieval**: **Implemented**
-- **Input chunking**: **Not implemented**
-
-**Evidence**
-- Semantic retrieval exists in in-memory and Chroma memory stores.
-- No dedicated summarizer/chunker pipeline before planner/LLM invocation.
+| Control | Status | Evidence |
+|---|---|---|
+| Context summarization | **Not implemented** | No summarization stage compacts long memory histories before planning. |
+| Semantic retrieval | **Implemented** | Semantic retrieval present in `memory/vector_memory.py`, `learning/experience_store.py`, and persistent backend memory (`backend/memory/vector_memory.py`). |
+| Input chunking | **Not implemented** | No chunking pipeline prior to retrieval/planning for large payloads/documents. |
 
 ### 4) Queue protection
 
-- **Task queue backpressure**: **Not implemented**
-- **Priority scheduling**: **Partially implemented**
-- **Worker throttling**: **Partially implemented**
-
-**Evidence**
-- Priority heaps exist in task graph engines.
-- Worker loop has polling interval but no dynamic throughput control, queue-depth thresholds, or producer-side rejection.
+| Control | Status | Evidence |
+|---|---|---|
+| Task queue backpressure | **Not implemented** | Queue APIs expose enqueue/dequeue without queue length limits, rejection, or admission control. |
+| Priority scheduling | **Implemented** | Priority heaps are used in task graph and graph engine to order ready tasks. |
+| Worker throttling | **Partially implemented** | Workers poll with fixed sleep intervals, but no adaptive throttling based on queue depth/error rate. |
 
 ### 5) Failure isolation
 
-- **Circuit breakers**: **Not implemented**
-- **Retry strategies**: **Partially implemented**
-- **Failure thresholds**: **Partially implemented**
-
-**Evidence**
-- Retry/backoff logic exists for scheduler and Crew task wrapper.
-- Alert manager tracks failure thresholds but does not actively open breakers, quarantine failing dependencies, or halt faulty pipelines.
+| Control | Status | Evidence |
+|---|---|---|
+| Circuit breakers | **Not implemented** | No closed/open/half-open breaker state for failing dependencies. |
+| Retry strategies | **Partially implemented** | Exponential backoff exists in orchestrator wrapper and scheduler, but not uniformly in all execution paths. |
+| Failure thresholds | **Partially implemented** | Alert manager detects threshold breaches, but does not actively isolate or stop failing domains. |
 
 ### 6) State durability
 
-- **Task graph persistence**: **Not implemented**
-- **Execution checkpoints**: **Not implemented**
-- **Recovery after crash**: **Partially implemented**
-
-**Evidence**
-- Backend memory persists context in Chroma.
-- Core task graph/task queue metadata is mostly in-memory; no journaled checkpoint for resume/replay.
-- Redis queue processing list supports at-least-once semantics but there is no reaper/claim logic for stale processing entries.
+| Control | Status | Evidence |
+|---|---|---|
+| Task graph persistence | **Not implemented** | Task graph state is in-memory and not durable across process restarts. |
+| Execution checkpoints | **Not implemented** | No persisted checkpoint after each state transition for replay/resume. |
+| Recovery after crash | **Partially implemented** | Redis backend uses processing queue (`BRPOPLPUSH`) and persistent stores exist for memory/state, but no stale-processing reclaimer or workflow resume logic. |
 
 ---
 
-## Collapse risk analysis (heavy agent activity)
+## System-collapse risks under heavy agent activity
 
-1. **Unbounded fan-out and recursive spawn storms**
-   - Tasks can spawn child tasks with no depth/volume ceiling, enabling exponential growth and queue saturation.
+1. **Spawn storm / fan-out collapse**  
+   Dynamic spawning paths can recursively enqueue tasks without hard global/depth limits.
 
-2. **Memory growth and degraded retrieval quality**
-   - In-memory record lists are unbounded in `VectorMemory`/`ExperienceStore`; long-running sessions can OOM or heavily degrade ranking latency.
+2. **Queue saturation with no shedding**  
+   Producers never throttle/reject low-priority work at high depth, causing tail latency spikes and throughput collapse.
 
-3. **Queue overload without producer backpressure**
-   - Producers always enqueue; no max queue length or shedding policy.
-   - Under load this leads to high latency, stale tasks, and eventual worker starvation.
+3. **In-flight task orphaning after worker crash**  
+   Processing queue entries can remain stranded indefinitely without visibility-timeout reclaim.
 
-4. **Stuck tasks in processing queue (Redis path)**
-   - `BRPOPLPUSH` to processing queue is used, but no visibility timeout reclamation. Worker crashes can leave tasks stranded indefinitely.
+4. **Retry amplification during dependency incidents**  
+   Local retries can magnify traffic/cost when upstream APIs degrade, especially without circuit breakers.
 
-5. **Retry amplification on flaky dependencies**
-   - Retries exist in some paths, but without global budget/concurrency-aware limits. During incidents, retries can amplify outbound traffic and cost.
+5. **Unbounded in-memory growth in core memory stores**  
+   Long-running runs append to in-memory vectors without retention/compaction limits.
 
-6. **No circuit breaker for failing tools/providers**
-   - Repeated failures continue hitting the same dependency, increasing tail latency and system-wide resource contention.
+6. **No strong per-call LLM spend governance**  
+   Budget controls are coarse loop-level estimates, not strict request/token gates.
 
-7. **No crash-safe checkpoints for execution graph**
-   - In-progress graph state can be lost on process crash, leading to duplicate execution or orphaned tasks.
+7. **No durable task graph/checkpoint resume**  
+   Crash or restart risks duplicate execution, lost progress, and orphaned dependencies.
 
-8. **Insufficient LLM spend governors**
-   - Cost is tracked at coarse loop level, but no per-request token cap/request cap model; a few bad prompts can consume budget quickly.
+8. **Failure detection without isolation action**  
+   Alerts are generated, but failing subsystems are not quarantined automatically.
 
 ---
 
-## Concrete code changes for production-grade reliability
+## Concrete production-hardening changes
 
-### A. Enforce task explosion boundaries
+### A. Add hard execution budgets and anti-explosion limits
 
-1. **Add global queue and spawn caps**
-   - Add `max_total_tasks`, `max_spawn_per_task`, `max_pending_tasks` settings.
-   - Reject/defer spawn when caps are hit.
-   - Touchpoints:
-     - `tasks/task_graph.py`
-     - `tasks/task_graph_engine.py`
-     - `backend/orchestrator/task_queue.py`
+- Introduce a shared `ExecutionLimits` config with:
+  - `max_total_tasks`
+  - `max_spawn_per_task`
+  - `max_task_depth`
+  - `max_pending_queue`
+  - `max_runtime_seconds_per_task`
+  - `max_retries_per_task`
+- Enforce these in:
+  - `tasks/task_graph.py` (`add_task`, `spawn_task`)
+  - `tasks/task_graph_engine.py` (`mark_task_completed` spawn path)
+  - `workers/agent_worker.py` (`process_once` execution wrapper)
+  - `core/task_queue.py` / backend queue abstractions (admission control)
 
-2. **Track and enforce max depth**
-   - Add `depth` in task metadata; root depth=0.
-   - `spawn_task` sets `depth + 1` and checks `max_task_depth`.
+### B. Make queueing resilient and self-protecting
 
-### B. Add universal runtime limits per task
+- Extend queue backends with:
+  - `queue_length(queue_name)`
+  - `max_queue_length` admission checks
+  - low-priority shedding policy when watermarks are exceeded
+- Implement stale-processing reclaim worker for Redis:
+  - track pop timestamps
+  - move stale entries from `:processing` back to ready queue after visibility timeout
 
-1. **Worker-side timeout + cancellation**
-   - Wrap `task_handler.execute()` in a timed future with hard timeout.
-   - Emit structured timeout failure and controlled retry.
-   - Touchpoint: `workers/agent_worker.py`.
+### C. Implement dependency circuit breakers
 
-2. **Standardize retries with jitter and attempt budget**
-   - Add common `RetryPolicy` utility used by worker, scheduler, orchestrator.
-   - Include exponential backoff + jitter + `max_elapsed_time`.
+- Add `CircuitBreaker` utility (closed/open/half-open) keyed by `tool/provider`.
+- Wrap outbound execution sites (LLM/tool calls, worker task handlers).
+- Open breaker after configurable rolling error threshold; allow probe requests in half-open.
 
-### C. Add queue backpressure and rate shaping
+### D. Standardize retries and timeouts
 
-1. **Queue depth watermarking**
-   - Add `queue_length()` backend API and high/critical watermarks.
-   - Producers throttle/reject low-priority tasks above thresholds.
+- Create shared retry utility with:
+  - exponential backoff + jitter
+  - max elapsed retry time
+  - retryable error classifier
+- Use one policy across orchestrator wrapper, worker execution, and scheduler jobs.
 
-2. **Worker concurrency and adaptive throttling**
-   - Worker pool reads queue depth and scales up/down within min/max workers.
-   - Enforce per-tool/provider concurrency limits.
+### E. Enforce true LLM/API budgets
 
-### D. Implement circuit breakers and failure containment
+- Add `BudgetManager` tracking per-session and global limits:
+  - `max_input_tokens`
+  - `max_output_tokens`
+  - `max_requests_per_execution`
+  - `max_cost_usd`
+- Reject/degrade requests before execution when limits are exceeded.
 
-1. **Dependency-level circuit breaker**
-   - Add breaker states (`closed/open/half_open`) per provider/tool key.
-   - Open after N failures in rolling window; probe in half-open.
+### F. Improve context scalability
 
-2. **Failure domains**
-   - Isolate failures by tool/provider/agent-type so one failing service does not degrade all workers.
+- Add hierarchical summarization for aged memory windows.
+- Add chunking (`chunk_size`, `overlap`) for large inputs and retrieve top-K chunks semantically.
+- Add retention/TTL policies for in-memory stores to avoid unbounded growth.
 
-### E. Strengthen cost and token governance
+### G. Add durable orchestration state
 
-1. **Per-call token cap + per-session request cap**
-   - Add LLM wrapper enforcing `max_input_tokens`, `max_output_tokens`, `max_requests_per_run`.
+- Persist task graph nodes/edges/state transitions in SQL (or Redis hash + AOF).
+- Write checkpoint after every transition (`pending → running → completed/failed`).
+- On startup, recover unfinished workflows and reconcile queue state idempotently.
 
-2. **Budget manager**
-   - Track cumulative spend by session and by dependency.
-   - Hard-stop or degrade to cheaper model once soft budget threshold reached.
+### H. Add automatic mitigation policies
 
-### F. Robust context management
-
-1. **Hierarchical summarization**
-   - Summarize old context windows into compressed memory objects.
-
-2. **Input chunking with semantic routing**
-   - Chunk long artifacts before retrieval/planning; score chunks semantically and keep top-K.
-
-### G. Durable state + crash recovery
-
-1. **Persist task graph and execution checkpoints**
-   - Store graph nodes/edges/states in durable store (Postgres/Redis hash).
-   - Write checkpoint after each state transition.
-
-2. **Recovery worker**
-   - On startup, reclaim stale processing tasks older than visibility timeout.
-   - Resume from latest checkpoint; dedupe by idempotency keys.
-
-### H. Observability and protection automation
-
-1. **SLO-oriented telemetry**
-   - Queue depth, dequeue latency, retry rate, breaker-open rate, cost/minute, token/minute.
-
-2. **Auto-mitigation policies**
-   - If queue depth > critical: pause non-critical planners and shed low-priority tasks.
-   - If error-rate spikes: open breakers and reduce concurrency automatically.
+- If queue depth critical: pause non-essential planners and shed low-priority tasks.
+- If provider failure-rate critical: open breaker and route to fallback model/tool.
+- If cost burn-rate spikes: downgrade model tier and reduce concurrency.
 
 ---
 
 ## Deployment decision
 
-- **Production-ready today?** **No** (high collapse risk under concurrent autonomous fan-out).
-- **Can become production-ready?** **Yes**, after implementing the controls above (especially explosion caps, backpressure, circuit breakers, and durable recovery).
+- **Production safe now?** **No.**
+- **Minimum gates before production:**
+  1) fan-out/depth caps,  
+  2) queue backpressure + stale reclaim,  
+  3) circuit breakers,  
+  4) durable checkpoints/recovery,  
+  5) strict token/request/cost budget enforcement.
