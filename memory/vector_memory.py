@@ -62,6 +62,15 @@ class VectorMemory:
                 return []
             q_embedding = self._embed(query)
 
+            def is_valid_record(record: object) -> bool:
+                if not isinstance(record, MemoryRecord):
+                    return False
+                if not isinstance(record.payload, dict):
+                    return False
+                if not isinstance(record.embedding, list):
+                    return False
+                return all(isinstance(value, int | float) for value in record.embedding)
+
             def cosine(a: list[float], b: list[float]) -> float:
                 numerator = sum(x * y for x, y in zip(a, b, strict=False))
                 a_norm = math.sqrt(sum(x * x for x in a))
@@ -70,5 +79,8 @@ class VectorMemory:
                     return 0.0
                 return numerator / (a_norm * b_norm)
 
-            ranked = sorted(self._records, key=lambda r: cosine(q_embedding, r.embedding), reverse=True)
+            valid_records = [record for record in self._records if is_valid_record(record)]
+            if not valid_records:
+                return []
+            ranked = sorted(valid_records, key=lambda r: cosine(q_embedding, r.embedding), reverse=True)
             return ranked[: max(1, limit)]
