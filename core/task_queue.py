@@ -9,6 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from core.retry_engine import PERMANENT, RetryEngine, get_default_retry_engine
 from monitoring.structured_logging import log_event
 
 
@@ -134,6 +135,7 @@ class DistributedTaskQueue:
         queue_low_watermark: int = 40,
         max_retries: int = 3,
         visibility_timeout_seconds: int = 30,
+        retry_engine: RetryEngine | None = None,
     ) -> None:
         if queue_high_watermark <= 0:
             raise ValueError("queue_high_watermark must be positive")
@@ -150,6 +152,7 @@ class DistributedTaskQueue:
         self.visibility_timeout_seconds = max(1, visibility_timeout_seconds)
         self._inflight: dict[str, tuple[QueueTask, float]] = {}
         self._logger = logging.getLogger(__name__)
+        self.retry_engine = retry_engine or get_default_retry_engine()
 
     @property
     def processing_queue_name(self) -> str:
@@ -180,6 +183,11 @@ class DistributedTaskQueue:
         if raw is None:
             return None
         task = QueueTask.from_json(raw)
+        next_attempt_at = float(task.metadata.get("next_attempt_at", 0.0) or 0.0)
+        if next_attempt_at > time.time():
+            self.backend.push(self.queue_name, task.to_json())
+            self.backend.ack(self.processing_queue_name, raw)
+            return None
         self._inflight[task.task_id] = (task, time.time() + self.visibility_timeout_seconds)
         return task
 
@@ -187,19 +195,44 @@ class DistributedTaskQueue:
         self._inflight.pop(task.task_id, None)
         self.backend.ack(self.processing_queue_name, task.to_json())
 
-    def fail_task(self, task: QueueTask, *, error: str) -> None:
+    def fail_task(self, task: QueueTask, *, error: str, exc: BaseException | None = None) -> None:
         self._inflight.pop(task.task_id, None)
         attempts = int(task.metadata.get("attempts", 0)) + 1
         task.metadata["attempts"] = attempts
         task.metadata["last_error"] = error
-        if attempts >= self.max_retries:
+        classification = self.retry_engine.classify_failure(
+            "queue_worker",
+            exc or error,
+            context={"task_id": task.task_id, "task_name": task.name},
+        )
+        task.metadata["retry_classification"] = classification
+        if classification == PERMANENT or attempts >= self.max_retries:
             self.backend.push(self.dead_letter_queue_name, task.to_json())
             self.backend.ack(self.processing_queue_name, task.to_json())
-            log_event(self._logger, component="queue", event="task_dead_lettered", severity="warning", task_id=task.task_id, attempts=attempts)
+            log_event(
+                self._logger,
+                component="queue",
+                event="task_dead_lettered",
+                severity="warning",
+                task_id=task.task_id,
+                attempts=attempts,
+                classification=classification,
+            )
             return
+        delay_seconds = self.retry_engine.compute_delay("queue_worker", attempts)
+        task.metadata["next_attempt_at"] = time.time() + delay_seconds
         self.backend.push(self.queue_name, task.to_json())
         self.backend.ack(self.processing_queue_name, task.to_json())
-        log_event(self._logger, component="queue", event="task_retried", severity="warning", task_id=task.task_id, attempts=attempts)
+        log_event(
+            self._logger,
+            component="queue",
+            event="task_retried",
+            severity="warning",
+            task_id=task.task_id,
+            attempts=attempts,
+            classification=classification,
+            delay_seconds=round(delay_seconds, 3),
+        )
 
     def queue_size(self) -> int:
         return self.backend.length(self.queue_name)
