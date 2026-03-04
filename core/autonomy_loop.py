@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from communication.message_bus import Message, MessageBus
+from core.context_manager import ContextWindowConfig, LLMContextManager
 from evaluation.auto_evaluator import AutoEvaluator
 from governance.human_validation import HumanValidationController, HumanValidationError
 from governance.policy_engine import PolicyEngine, PolicyViolationError
@@ -56,6 +57,7 @@ class AutonomousPlanningLoop:
         policy_engine: PolicyEngine | None = None,
         human_validation: HumanValidationController | None = None,
         alert_manager: AlertManager | None = None,
+        llm_context_window_tokens: int = 8192,
     ) -> None:
         self.planner = planner
         self.executor = executor
@@ -68,6 +70,10 @@ class AutonomousPlanningLoop:
         self.policy_engine = policy_engine
         self.human_validation = human_validation
         self.alert_manager = alert_manager
+        self.context_manager = LLMContextManager(
+            memory=memory,
+            config=ContextWindowConfig(max_context_tokens=llm_context_window_tokens),
+        )
 
     def run_cycle(self) -> dict:
         goals = self.planner.evaluate_active_goals()
@@ -86,6 +92,7 @@ class AutonomousPlanningLoop:
             )
             for record in prior_experience
         ]
+        combined_context = self.context_manager.prepare_planner_context(goals=goals, extra_records=combined_context)
 
         plan = self.planner.generate_plan(goals, combined_context)
         for item in plan:
