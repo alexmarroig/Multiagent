@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from governance.approval_queue import ApprovalQueue
+
 
 @dataclass(slots=True)
 class ValidationGates:
@@ -19,8 +21,16 @@ class HumanValidationError(RuntimeError):
 
 
 class HumanValidationController:
-    def __init__(self, gates: ValidationGates | None = None) -> None:
+    def __init__(
+        self,
+        gates: ValidationGates | None = None,
+        *,
+        approval_queue: ApprovalQueue | None = None,
+        block_on_pending: bool = False,
+    ) -> None:
         self.gates = gates or ValidationGates()
+        self.approval_queue = approval_queue
+        self.block_on_pending = block_on_pending
         self._approvals: dict[str, bool] = {}
 
     def grant_approval(self, token: str) -> None:
@@ -28,6 +38,12 @@ class HumanValidationController:
 
     def _require(self, token: str, reason: str) -> None:
         if not self._approvals.get(token, False):
+            if self.approval_queue is not None and self.block_on_pending:
+                self.approval_queue.submit(token=token, reason=reason)
+                decision = self.approval_queue.wait_for_resolution(token)
+                if decision.status == "approved":
+                    self._approvals[token] = True
+                    return
             raise HumanValidationError(f"Execution paused pending human approval ({reason}). token={token}")
 
     def request_approval(self, *, token: str, reason: str) -> None:
