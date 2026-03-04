@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from monitoring.alerts import AlertManager
+from agentos.monitoring.alerts import AlertManager
 
 
 def run_audit() -> dict[str, object]:

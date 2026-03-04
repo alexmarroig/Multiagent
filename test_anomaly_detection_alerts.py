@@ -1,5 +1,5 @@
-from monitoring.alerts import AlertManager
-from monitoring.anomaly_detector import RollingAnomalyDetector
+from agentos.monitoring.alerts import AlertManager
+from agentos.monitoring.anomaly_detector import RollingAnomalyDetector
 
 
 def test_rolling_anomaly_detector_flags_all_runtime_metrics():

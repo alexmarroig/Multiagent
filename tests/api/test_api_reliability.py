@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from monitoring.system_health import router as system_health_router
+from agentos.monitoring.system_health import router as system_health_router
 
 
 class TaskRequest(BaseModel):

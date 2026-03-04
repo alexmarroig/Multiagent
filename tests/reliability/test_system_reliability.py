@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import time
 
-from communication.event_bus import EventBus
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
+from agentos.communication.event_bus import EventBus
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
 from workers.agent_worker import AgentWorker
 from workers.watchdog import WorkerWatchdog
 
@@ -31,7 +31,7 @@ def test_queue_saturation_triggers_backpressure() -> None:
 
 
 def test_llm_budget_overrun_alerts() -> None:
-    from monitoring.alerts import AlertManager
+    from agentos.monitoring.alerts import AlertManager
 
     manager = AlertManager(llm_budget_limit=1.0)
     alerts = manager.evaluate_runtime_signals(queue_depth=1, error_rate=0.0, llm_cost=5.0)

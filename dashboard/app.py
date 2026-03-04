@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
-from monitoring.system_health import health_service, router as health_router
+from agentos.monitoring.system_health import health_service, router as health_router
 
 app = FastAPI(title="Agent Platform Reliability Dashboard")
 app.include_router(health_router)

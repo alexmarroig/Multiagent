@@ -1,4 +1,4 @@
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
 from tasks.task_graph_engine import TaskGraphEngine
 
 

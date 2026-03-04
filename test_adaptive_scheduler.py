@@ -1,4 +1,4 @@
-from scheduler.adaptive_scheduler import AdaptiveScheduler
+from agentos.scheduler.adaptive_scheduler import AdaptiveScheduler
 
 
 def test_reduces_spawn_and_pauses_low_priority_when_queue_high():

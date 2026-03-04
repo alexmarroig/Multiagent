@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from communication.event_bus import EventBus
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend, QueueTask
+from agentos.communication.event_bus import EventBus
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend, QueueTask
 from memory.vector_memory import VectorMemory
 from workers.agent_worker import AgentWorker
 

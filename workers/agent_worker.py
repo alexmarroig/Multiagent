@@ -8,10 +8,10 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Protocol
 
-from communication.event_bus import Event, EventBus
-from core.task_queue import DistributedTaskQueue, QueueTask
-from core.retry_engine import RetryEngine, get_default_retry_engine
-from monitoring.tracing import get_tracer
+from agentos.communication.event_bus import Event, EventBus
+from agentos.core.task_queue import DistributedTaskQueue, QueueTask
+from agentos.core.retry_engine import RetryEngine, get_default_retry_engine
+from agentos.monitoring.tracing import get_tracer
 
 
 class TaskHandler(Protocol):

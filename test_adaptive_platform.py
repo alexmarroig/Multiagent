@@ -2,9 +2,9 @@ from learning.experience_store import ExperienceStore
 from learning.performance_feedback import PerformanceFeedback
 from apps.orchestrator.langgraph_planner import generate_plan
 from evaluation.auto_evaluator import AutoEvaluator
-from governance.human_validation import HumanValidationController, HumanValidationError, ValidationGates
-from governance.policy_engine import Policy, PolicyEngine, PolicyViolationError
-from monitoring.alerts import AlertManager
+from agentos.governance.human_validation import HumanValidationController, HumanValidationError, ValidationGates
+from agentos.governance.policy_engine import Policy, PolicyEngine, PolicyViolationError
+from agentos.monitoring.alerts import AlertManager
 
 
 def test_planner_uses_experience_and_feedback_context():

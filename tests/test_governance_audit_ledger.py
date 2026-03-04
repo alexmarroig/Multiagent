@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from governance.audit_ledger import (
+from agentos.governance.audit_ledger import (
     EVENT_APPROVAL_DECISION,
     EVENT_BUDGET_OVERRIDE,
     EVENT_POLICY_VIOLATION,

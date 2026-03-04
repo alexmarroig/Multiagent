@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from backend.tools.circuit_breaker import CircuitBreakerConfig, CircuitBreakerManager, CircuitOpenError
+from agentos.backend.tools.circuit_breaker import CircuitBreakerConfig, CircuitBreakerManager, CircuitOpenError
 
 
 def run_audit() -> dict[str, object]:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.context_manager import ContextWindowConfig, LLMContextManager
+from agentos.core.context_manager import ContextWindowConfig, LLMContextManager
 from memory.vector_memory import VectorMemory
 
 

@@ -1,4 +1,4 @@
-from monitoring.slo_monitor import SLOMonitor, SLOSnapshot, SLOThresholds
+from agentos.monitoring.slo_monitor import SLOMonitor, SLOSnapshot, SLOThresholds
 
 
 def test_slo_monitor_triggers_alert_incident_and_mitigation_for_each_violation():

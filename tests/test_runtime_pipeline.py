@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from core.execution_gateway import ExecutionGateway, GatewayPolicy
-from governance.approval_queue import ApprovalQueue
-from governance.policy_engine import PolicyViolationError
-from tools.sandbox_runner import SandboxResult
+from agentos.core.execution_gateway import ExecutionGateway, GatewayPolicy
+from agentos.governance.approval_queue import ApprovalQueue
+from agentos.governance.policy_engine import PolicyViolationError
+from agentos.tools.sandbox_runner import SandboxResult
 
 
 class _RunnerStub:

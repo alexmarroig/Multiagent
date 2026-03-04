@@ -5,7 +5,7 @@ import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
 
 
 def _execute_task(task_id: int, queue: DistributedTaskQueue) -> float:

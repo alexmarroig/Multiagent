@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from monitoring.tracing import get_tracer
+from agentos.monitoring.tracing import get_tracer
 
 
 @dataclass(slots=True)

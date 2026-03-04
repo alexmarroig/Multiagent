@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from communication.event_bus import Event, EventBus
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend, QueueTask
+from agentos.communication.event_bus import Event, EventBus
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend, QueueTask
 from workers.agent_worker import AgentWorker
 from workers.watchdog import WorkerWatchdog
 

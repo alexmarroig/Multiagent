@@ -10,9 +10,9 @@ from heapq import heappop, heappush
 from pathlib import Path
 from typing import Any
 
-from communication.event_bus import Event, EventBus
-from core.task_queue import DistributedTaskQueue, QueueTask
-from governance.human_validation import HumanValidationController
+from agentos.communication.event_bus import Event, EventBus
+from agentos.core.task_queue import DistributedTaskQueue, QueueTask
+from agentos.governance.human_validation import HumanValidationController
 
 
 @dataclass(slots=True)

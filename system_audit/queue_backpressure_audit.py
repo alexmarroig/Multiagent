@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
 
 
 def run_audit() -> dict[str, object]:

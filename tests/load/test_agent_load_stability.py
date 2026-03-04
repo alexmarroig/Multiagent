@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from communication.event_bus import EventBus
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
+from agentos.communication.event_bus import EventBus
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
 from workers.agent_worker import AgentWorker
 
 

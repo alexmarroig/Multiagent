@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import random
 
-from communication.message_bus import MessageBus
-from core.autonomy_loop import AutonomousPlanningLoop
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
+from agentos.communication.message_bus import MessageBus
+from agentos.core.autonomy_loop import AutonomousPlanningLoop
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend
 from learning.experience_store import ExperienceStore
 from learning.performance_feedback import PerformanceFeedback
 from memory.vector_memory import MemoryRecord, VectorMemory

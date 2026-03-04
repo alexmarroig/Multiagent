@@ -9,10 +9,10 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from communication.event_bus import Event, EventBus
-from core.task_queue import DistributedTaskQueue, QueueTask
+from agentos.communication.event_bus import Event, EventBus
+from agentos.core.task_queue import DistributedTaskQueue, QueueTask
 from workers.agent_worker import AgentWorker
-from monitoring.structured_logging import log_event
+from agentos.monitoring.structured_logging import log_event
 
 ResourceProbe = Callable[[AgentWorker], dict[str, Any] | None]
 WorkerFactory = Callable[[str], AgentWorker]

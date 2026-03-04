@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from communication.event_bus import EventBus
-from core.execution_gateway import ExecutionGateway, GatewayPolicy
-from core.retry_engine import RetryEngine, RetryPolicy
-from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend, QueueTask
-from tools.sandbox_runner import SandboxResult
+from agentos.communication.event_bus import EventBus
+from agentos.core.execution_gateway import ExecutionGateway, GatewayPolicy
+from agentos.core.retry_engine import RetryEngine, RetryPolicy
+from agentos.core.task_queue import DistributedTaskQueue, InMemoryQueueBackend, QueueTask
+from agentos.tools.sandbox_runner import SandboxResult
 from workers.agent_worker import AgentWorker
 
 
@@ -87,7 +87,7 @@ def test_execution_gateway_retries_external_api_tools(monkeypatch) -> None:
             return SandboxResult(ok=False, error="remote api timeout")
         return SandboxResult(ok=True, output={"ok": True})
 
-    monkeypatch.setattr("core.execution_gateway.DEFAULT_SANDBOX_RUNNER.run_callable", _mock_run_callable)
+    monkeypatch.setattr("agentos.core.execution_gateway.DEFAULT_SANDBOX_RUNNER.run_callable", _mock_run_callable)
 
     retry_engine = RetryEngine(
         policies={"external_api": RetryPolicy(max_retries=3, base_delay_seconds=0.0, jitter_ratio=0.0)},
