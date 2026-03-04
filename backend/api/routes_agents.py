@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth.dependencies import get_current_user
 from autonomy.agent_loop import AutonomousAgentLoop, LoopGuardrails
+from autonomy.task_decomposer import DecompositionConstraints, TaskDecomposer
 from db.supabase_client import get_supabase
 from models.schemas import FlowConfig
 from observability.logging import log_structured
@@ -104,19 +105,20 @@ async def execute_flow(flow: FlowConfig) -> None:
 
     try:
         crew = build_crew_from_config(flow, event_recorder=record_event, cancellation_checker=is_cancelled)
+        decomposer = TaskDecomposer(
+            DecompositionConstraints(
+                max_depth=3,
+                max_subtasks_per_task=4,
+                max_total_tasks=max(6, flow.autonomy.max_iterations * 3),
+                max_task_tokens=220,
+            )
+        )
 
         def planner_fn(objective: str, context: list[dict[str, Any]]) -> list[QueuedTask]:
-            existing = {item.get("payload", {}).get("objective") for item in context}
-            if objective in existing:
-                return []
-            return [
-                QueuedTask(
-                    task_id=f"{flow.session_id}-main",
-                    agent_id="supervisor",
-                    description=f"Planejar e executar objetivo: {objective}",
-                    payload={"objective": objective, "flow_inputs": flow.inputs},
-                )
-            ]
+            tasks = decomposer.decompose(objective=objective, session_id=flow.session_id, context=context)
+            for task in tasks:
+                task.payload = {**task.payload, "flow_inputs": flow.inputs}
+            return tasks
 
         def execute_fn(payload: dict[str, Any]) -> Any:
             return crew.kickoff(inputs={**flow.inputs, **payload.get("payload", {})})

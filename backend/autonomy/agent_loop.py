@@ -9,6 +9,7 @@ from typing import Any, Callable
 from agents.communication_bus import CommunicationBus
 from goals.goal_manager import GoalManager
 from memory.vector_memory import VectorMemory
+from autonomy.task_decomposer import TaskDecomposer
 from orchestrator.task_queue import QueuedTask, TaskQueue
 
 
@@ -39,6 +40,7 @@ class AutonomousAgentLoop:
         self.task_queue = TaskQueue()
         self.bus = CommunicationBus()
         self.accumulated_cost = 0.0
+        self.decomposer = TaskDecomposer()
 
     def _evaluate_current_state(self) -> list[dict[str, Any]]:
         return self.memory.retrieve_context(limit=20)
@@ -74,16 +76,13 @@ class AutonomousAgentLoop:
             outputs.append(output)
             self.memory.store_task_result(task.task_id, output)
 
-            spawned = task.payload.get("spawn_tasks", [])
-            for item in spawned:
-                self.task_queue.enqueue(
-                    QueuedTask(
-                        task_id=item.get("task_id", f"{task.task_id}-child"),
-                        agent_id=item.get("agent_id", task.agent_id),
-                        description=item.get("description", "Subtask descoberta dinamicamente"),
-                        payload=item.get("payload", {}),
-                    )
-                )
+            discovered_work = result.get("spawn_tasks", []) if isinstance(result, dict) else []
+            for spawned_task in self.decomposer.generate_dynamic_subtasks(
+                session_id=self.session_id,
+                parent_task_id=task.task_id,
+                discovered_work=discovered_work,
+            ):
+                self.task_queue.enqueue(spawned_task)
 
             delegate_to = task.payload.get("delegate_to")
             if delegate_to:
