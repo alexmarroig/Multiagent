@@ -22,6 +22,6 @@ RUN set -eux; \
 
 RUN playwright install chromium
 
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app/backend:/app
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]

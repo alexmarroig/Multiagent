@@ -6,12 +6,12 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from agents.communication_bus import CommunicationBus
-from goals.goal_manager import GoalManager
-from memory.vector_memory import VectorMemory
-from autonomy.task_decomposer import TaskDecomposer
+from backend.agents.communication_bus import CommunicationBus
+from backend.goals.goal_manager import GoalManager
+from backend.memory.vector_memory import VectorMemory
+from backend.autonomy.task_decomposer import TaskDecomposer
 from governance.control_plane import validation_controller
-from orchestrator.task_queue import QueuedTask, TaskQueue
+from backend.orchestrator.task_queue import QueuedTask, TaskQueue
 
 
 @dataclass
