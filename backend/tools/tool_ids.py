@@ -12,6 +12,9 @@ CANONICAL_TOOL_IDS: Final[tuple[str, ...]] = (
     "search",
     "browser",
     "travel",
+    "filesystem",
+    "api",
+    "database",
 )
 
 TOOL_ID_ALIASES: Final[dict[str, str]] = {
@@ -22,6 +25,12 @@ TOOL_ID_ALIASES: Final[dict[str, str]] = {
     "google-calendar": "calendar",
     "tavily": "search",
     "playwright": "browser",
+    "file": "filesystem",
+    "fs": "filesystem",
+    "http": "api",
+    "rest": "api",
+    "sql": "database",
+    "db": "database",
 }
 
 

@@ -12,15 +12,19 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth.dependencies import get_current_user
+from autonomy.agent_loop import AutonomousAgentLoop, LoopGuardrails
 from db.supabase_client import get_supabase
 from models.schemas import FlowConfig
 from observability.logging import log_structured
 from observability.metrics import metrics_store
 from orchestrator.crew_builder import ExecutionCancelledError, build_crew_from_config
 from orchestrator.event_stream import make_event, publish_event
+from orchestrator.task_queue import QueuedTask
+from scheduler.agent_scheduler import AgentScheduler
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 logger = logging.getLogger("agentos-backend")
+agent_scheduler = AgentScheduler()
 
 TERMINAL_STATUSES = {"done", "error", "cancelled"}
 RUNNING_EXECUTIONS: dict[str, asyncio.Task[Any]] = {}
@@ -96,48 +100,58 @@ async def execute_flow(flow: FlowConfig) -> None:
         current = _current_status(supabase, flow.session_id)
         return current in {"cancelling", "cancelled"}
 
-    await emit(
-        make_event(
-            flow.session_id,
-            "system",
-            "AgentOS",
-            "thinking",
-            "Iniciando execução do fluxo",
-        )
-    )
+    await emit(make_event(flow.session_id, "system", "AgentOS", "thinking", "Iniciando execução autônoma"))
 
     try:
-        crew = build_crew_from_config(
-            flow,
-            event_recorder=record_event,
-            cancellation_checker=is_cancelled,
+        crew = build_crew_from_config(flow, event_recorder=record_event, cancellation_checker=is_cancelled)
+
+        def planner_fn(objective: str, context: list[dict[str, Any]]) -> list[QueuedTask]:
+            existing = {item.get("payload", {}).get("objective") for item in context}
+            if objective in existing:
+                return []
+            return [
+                QueuedTask(
+                    task_id=f"{flow.session_id}-main",
+                    agent_id="supervisor",
+                    description=f"Planejar e executar objetivo: {objective}",
+                    payload={"objective": objective, "flow_inputs": flow.inputs},
+                )
+            ]
+
+        def execute_fn(payload: dict[str, Any]) -> Any:
+            return crew.kickoff(inputs={**flow.inputs, **payload.get("payload", {})})
+
+        loop = AutonomousAgentLoop(
+            session_id=flow.session_id,
+            objective=flow.autonomy.objective or "Concluir execução do fluxo",
+            execute_fn=execute_fn,
+            planner_fn=planner_fn,
+            guardrails=LoopGuardrails(
+                max_iterations=flow.autonomy.max_iterations,
+                max_runtime_seconds=flow.autonomy.max_runtime_seconds,
+                max_cost=flow.autonomy.max_cost,
+            ),
+            completion_keywords=flow.autonomy.completion_keywords,
         )
 
-        result = await asyncio.to_thread(crew.kickoff, inputs=flow.inputs)
+        result = await asyncio.to_thread(loop.run)
 
         if is_cancelled():
-            raise ExecutionCancelledError("Execução cancelada após kickoff.")
+            raise ExecutionCancelledError("Execução cancelada durante loop autônomo.")
 
-        await emit(
-            make_event(
-                flow.session_id,
-                "system",
-                "AgentOS",
-                "done",
-                "Execução finalizada",
-            )
-        )
+        await emit(make_event(flow.session_id, "system", "AgentOS", "done", "Loop autônomo finalizado"))
 
         duration = int((datetime.utcnow() - started).total_seconds())
+        status = "done" if result.get("status") == "completed" else "stopped"
 
-        metrics_store.mark_run_finished(flow.session_id, "done")
+        metrics_store.mark_run_finished(flow.session_id, status)
 
         _safe_update_execution(
             supabase,
             flow.session_id,
             {
-                "status": "done",
-                "result": {"output": str(result)},
+                "status": status,
+                "result": result,
                 "events": event_log,
                 "completed_at": datetime.utcnow().isoformat(),
                 "duration_seconds": duration,
@@ -148,15 +162,7 @@ async def execute_flow(flow: FlowConfig) -> None:
     except (asyncio.CancelledError, ExecutionCancelledError) as exc:
         payload = {"reason": str(exc) or "Execução cancelada"}
 
-        await emit(
-            make_event(
-                flow.session_id,
-                "system",
-                "AgentOS",
-                "cancelled",
-                payload,
-            )
-        )
+        await emit(make_event(flow.session_id, "system", "AgentOS", "cancelled", payload))
 
         _safe_update_execution(
             supabase,
@@ -171,22 +177,10 @@ async def execute_flow(flow: FlowConfig) -> None:
         )
 
     except Exception as exc:
-        error_payload = {
-            "error": str(exc),
-            "trace": traceback.format_exc(),
-        }
+        error_payload = {"error": str(exc), "trace": traceback.format_exc()}
 
         metrics_store.mark_run_finished(flow.session_id, "error")
-
-        await emit(
-            make_event(
-                flow.session_id,
-                "system",
-                "AgentOS",
-                "error",
-                error_payload,
-            )
-        )
+        await emit(make_event(flow.session_id, "system", "AgentOS", "error", error_payload))
 
         _safe_update_execution(
             supabase,
@@ -210,14 +204,8 @@ async def run_flow(
     flow: FlowConfig,
     user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
-
     session_id = flow.session_id or str(uuid.uuid4())
-    flow = flow.model_copy(
-        update={
-            "session_id": session_id,
-            "user_id": user["id"],
-        }
-    )
+    flow = flow.model_copy(update={"session_id": session_id, "user_id": user["id"]})
 
     supabase = get_supabase()
 
@@ -239,7 +227,15 @@ async def run_flow(
     task = asyncio.create_task(execute_flow(flow))
     RUNNING_EXECUTIONS[session_id] = task
 
-    return {"session_id": session_id, "status": "running"}
+    if flow.autonomy.schedule_every_minutes:
+        agent_scheduler.queue_periodic_task(
+            job_id=f"autonomy-{session_id}",
+            every_minutes=flow.autonomy.schedule_every_minutes,
+            job_fn=lambda: asyncio.run(execute_flow(flow.model_copy())),
+        )
+        agent_scheduler.start()
+
+    return {"session_id": session_id, "status": "running", "autonomy_enabled": flow.autonomy.enabled}
 
 
 @router.post("/{session_id}/cancel")
@@ -247,7 +243,6 @@ async def cancel_flow(
     session_id: str,
     user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
-
     supabase = get_supabase()
 
     execution = (
@@ -269,17 +264,9 @@ async def cancel_flow(
     status = rows[0].get("status")
 
     if status in TERMINAL_STATUSES:
-        return {
-            "session_id": session_id,
-            "status": status,
-            "message": "Execução já finalizada",
-        }
+        return {"session_id": session_id, "status": status, "message": "Execução já finalizada"}
 
-    _safe_update_execution(
-        supabase,
-        session_id,
-        {"status": "cancelling", "updated_at": datetime.utcnow().isoformat()},
-    )
+    _safe_update_execution(supabase, session_id, {"status": "cancelling", "updated_at": datetime.utcnow().isoformat()})
 
     cancel_event = CANCEL_FLAGS.setdefault(session_id, asyncio.Event())
     cancel_event.set()

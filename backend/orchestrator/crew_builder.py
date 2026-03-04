@@ -20,7 +20,7 @@ from models.schemas import AgentType, FlowConfig, LLMProvider, NodeConfig
 from observability.logging import log_structured
 from observability.metrics import metrics_store
 from orchestrator.event_stream import make_event, publish_event
-from tools.tool_ids import normalize_tool_ids
+from tools.runtime_tools import resolve_tools
 
 
 logger = logging.getLogger("agentos-orchestrator")
@@ -176,11 +176,6 @@ def _wrap_task_execution(
     task.execute_sync = wrapped  # type: ignore
 
 
-def _resolve_tools(tool_names: Iterable[str]) -> list[Any]:
-    normalized, _ = normalize_tool_ids(list(tool_names))
-    return []  # ferramentas externas são resolvidas em outra camada
-
-
 def topological_sort(nodes: list[NodeConfig], edges: list[tuple[str, str]]) -> list[NodeConfig]:
     node_map = {node.id: node for node in nodes}
     indegree = {node.id: 0 for node in nodes}
@@ -231,7 +226,7 @@ def build_crew_from_config(
             role=node.label,
             goal=f"Executar tarefas do agente {node.label}",
             backstory=prompt,
-            tools=[],
+            tools=resolve_tools(node),
             llm=llm,
             verbose=True,
             allow_delegation=node.agent_type == AgentType.supervisor,
