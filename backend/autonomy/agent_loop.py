@@ -36,17 +36,92 @@ class AutonomousAgentLoop:
         self.planner_fn = planner_fn
         self.guardrails = guardrails or LoopGuardrails()
         self.goal_manager = GoalManager(objective=objective, completion_keywords=completion_keywords)
-        self.memory = VectorMemory(session_id=session_id)
+        try:
+            self.memory = VectorMemory(session_id=session_id)
+        except TypeError:
+            self.memory = VectorMemory()
         self.task_queue = TaskQueue()
         self.bus = CommunicationBus()
         self.accumulated_cost = 0.0
         self.decomposer = TaskDecomposer()
 
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        return max(1, len(text) // 4)
+
+    def _summarize_context(self, context: list[dict[str, Any]], token_budget: int) -> dict[str, Any] | None:
+        if not context:
+            return None
+
+        consumed = 0
+        snippets: list[str] = []
+        for item in context:
+            payload = item.get("payload", item)
+            snippet = str(payload)[:400]
+            snippet_tokens = self._estimate_tokens(snippet)
+            if consumed + snippet_tokens > token_budget:
+                break
+            snippets.append(snippet)
+            consumed += snippet_tokens
+
+        if not snippets:
+            return None
+
+        return {
+            "metadata": {"kind": "summary", "source_items": len(snippets)},
+            "payload": {"summary": " | ".join(snippets)},
+        }
+
+    def _prepare_planner_context(self, objective: str, context: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # 1) Retrieve relevant memory for this objective.
+        semantic_hits: list[dict[str, Any]] = []
+        if hasattr(self.memory, "semantic_search"):
+            semantic_hits = list(self.memory.semantic_search(objective, limit=8))
+
+        normalized_hits = [
+            {"metadata": item.get("metadata", {}), "payload": item.get("document", item.get("payload", {}))}
+            for item in semantic_hits
+        ]
+        all_items = context + normalized_hits
+
+        # 2) Summarize long histories to preserve key information in limited windows.
+        compact: list[dict[str, Any]] = []
+        long_items: list[dict[str, Any]] = []
+        for item in all_items:
+            tokens = self._estimate_tokens(str(item.get("payload", item)))
+            if tokens > 180:
+                long_items.append(item)
+            else:
+                compact.append(item)
+
+        summary = self._summarize_context(long_items, token_budget=220)
+        if summary is not None:
+            compact.append(summary)
+
+        # 3) Truncate low-priority context when over budget.
+        compact = sorted(
+            compact,
+            key=lambda item: 0 if item.get("metadata", {}).get("kind") == "summary" else 1,
+        )
+        budget = 700
+        selected: list[dict[str, Any]] = []
+        used = 0
+        for item in compact:
+            tokens = self._estimate_tokens(str(item.get("payload", item)))
+            if used + tokens > budget:
+                continue
+            selected.append(item)
+            used += tokens
+
+        # 4) Assemble final context.
+        return selected
+
     def _evaluate_current_state(self) -> list[dict[str, Any]]:
         return self.memory.retrieve_context(limit=20)
 
     def _plan_new_tasks(self, context: list[dict[str, Any]]) -> None:
-        planned = self.planner_fn(self.goal_manager.state.objective, context)
+        llm_context = self._prepare_planner_context(self.goal_manager.state.objective, context)
+        planned = self.planner_fn(self.goal_manager.state.objective, llm_context)
         for task in planned:
             self.task_queue.enqueue(task)
 

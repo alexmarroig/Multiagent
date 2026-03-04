@@ -133,6 +133,21 @@ class LLMContextManager:
 
         return selected
 
+    def _summarize_long_histories(self, records: list[MemoryRecord]) -> tuple[list[MemoryRecord], MemoryRecord | None]:
+        long_records: list[MemoryRecord] = []
+        compact_records: list[MemoryRecord] = []
+        long_threshold = max(120, self.config.prompt_budget_tokens // 3)
+
+        for record in records:
+            if self._estimate_tokens(self._record_text(record)) > long_threshold:
+                long_records.append(record)
+            else:
+                compact_records.append(record)
+
+        summary_budget = max(96, self.config.prompt_budget_tokens // 4)
+        summary = self._summarize_records(long_records, max_tokens=summary_budget)
+        return compact_records, summary
+
     def _chunk_large_goal_text(self, goals: list[str]) -> list[MemoryRecord]:
         if not goals:
             return []
@@ -153,32 +168,34 @@ class LLMContextManager:
             )
         return chunk_records
 
+    def assemble_context(
+        self,
+        *,
+        user_input: list[str],
+        extra_records: list[MemoryRecord] | None = None,
+    ) -> list[MemoryRecord]:
+        # 1) Retrieve relevant memory semantically.
+        query = " ".join(user_input) or "active goals"
+        dynamic_limit = max(4, min(40, self.config.prompt_budget_tokens // 120))
+        retrieved = self.memory.semantic_retrieve(query, limit=dynamic_limit)
+
+        # 2) Chunk large user input before it enters the prompt.
+        all_records = self._chunk_large_goal_text(user_input) + retrieved
+        if extra_records:
+            all_records.extend(extra_records)
+
+        # 3) Summarize long histories.
+        compact_records, summary = self._summarize_long_histories(all_records)
+        if summary is not None:
+            compact_records.append(summary)
+
+        # 4) Truncate low-priority items and keep only budget-fitting context.
+        return self._truncate_by_priority(compact_records)
+
     def prepare_planner_context(
         self,
         *,
         goals: list[str],
         extra_records: list[MemoryRecord] | None = None,
     ) -> list[MemoryRecord]:
-        query = " ".join(goals) or "active goals"
-        dynamic_limit = max(4, min(40, self.config.prompt_budget_tokens // 120))
-        retrieved = self.memory.semantic_retrieve(query, limit=dynamic_limit)
-
-        all_records = self._chunk_large_goal_text(goals) + retrieved
-        if extra_records:
-            all_records.extend(extra_records)
-
-        long_records: list[MemoryRecord] = []
-        compact_records: list[MemoryRecord] = []
-        long_threshold = max(120, self.config.prompt_budget_tokens // 3)
-        for record in all_records:
-            if self._estimate_tokens(self._record_text(record)) > long_threshold:
-                long_records.append(record)
-            else:
-                compact_records.append(record)
-
-        summary_budget = max(96, self.config.prompt_budget_tokens // 4)
-        summary = self._summarize_records(long_records, max_tokens=summary_budget)
-        if summary is not None:
-            compact_records.append(summary)
-
-        return self._truncate_by_priority(compact_records)
+        return self.assemble_context(user_input=goals, extra_records=extra_records)
