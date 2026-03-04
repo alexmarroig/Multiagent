@@ -8,7 +8,11 @@ produces useful tasks for common software quality and AI-ops objectives.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
+
+if TYPE_CHECKING:
+    from learning.experience_store import ExperienceStore
+    from learning.performance_feedback import PerformanceFeedback
 
 
 @dataclass(frozen=True)
@@ -128,20 +132,63 @@ def _matched_templates(objective: str) -> Iterable[PlanTemplate]:
             yield template
 
 
-def _build_plan_markdown(objective: str, tasks: list[dict]) -> str:
+def _build_plan_markdown(
+    objective: str,
+    tasks: list[dict],
+    planning_context: list[str] | None = None,
+) -> str:
     """Render the final markdown plan from selected tasks."""
 
     lines = [f"# Plano para: {objective}", "", "## Etapas propostas:"]
+    if planning_context:
+        lines.extend(["", "## Contexto adaptativo considerado:"])
+        for item in planning_context:
+            lines.append(f"- {item}")
     for idx, task in enumerate(tasks, start=1):
         lines.append(f"{idx}. **{task['title']}** — {task['description']}")
     return "\n".join(lines)
 
 
-def generate_plan(objective: str):
+def generate_plan(
+    objective: str,
+    experience_store: "ExperienceStore | None" = None,
+    performance_feedback: "PerformanceFeedback | None" = None,
+):
     """Generate markdown plan and ordered task payload for a given objective."""
 
     cleaned_objective = objective.strip()
     tasks: list[dict[str, str | int]] = []
+    planning_context: list[str] = []
+
+    if experience_store is not None:
+        similar_records = experience_store.query_similar(
+            cleaned_objective,
+            limit=3,
+            kinds={"task_outcome", "success_metrics", "execution_trace", "evaluation"},
+        )
+        for record in similar_records:
+            summary = record.payload.get("task_id") or record.payload.get("goal") or record.kind
+            planning_context.append(f"Histórico similar: {summary}")
+
+    if performance_feedback is not None:
+        signals = performance_feedback.planner_signals()
+        planning_context.append(
+            "Taxa de sucesso histórica: "
+            f"{signals['global_success_rate']:.0%}; falhas repetidas={signals['repeated_failures']}"
+        )
+
+        tool_effectiveness = signals.get("tool_effectiveness", {})
+        if tool_effectiveness:
+            best_tool, best_score = max(tool_effectiveness.items(), key=lambda item: item[1])
+            planning_context.append(f"Ferramenta mais efetiva: {best_tool} ({best_score:.0%})")
+
+        agent_history = signals.get("agent_performance", {})
+        if agent_history:
+            best_agent, perf = max(agent_history.items(), key=lambda item: item[1]["success_rate"])
+            planning_context.append(
+                f"Agente com melhor histórico: {best_agent} "
+                f"({perf['success_rate']:.0%} sucesso)"
+            )
 
     for title, description in BASE_TASKS:
         tasks.append({"title": title, "description": description})
@@ -161,5 +208,5 @@ def generate_plan(objective: str):
     for order_index, task in enumerate(tasks):
         task["order_index"] = order_index
 
-    plan_markdown = _build_plan_markdown(cleaned_objective, tasks)
+    plan_markdown = _build_plan_markdown(cleaned_objective, tasks, planning_context)
     return plan_markdown, tasks

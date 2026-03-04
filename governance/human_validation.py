@@ -1,0 +1,42 @@
+"""Configurable human validation gates with pause/resume semantics."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass(slots=True)
+class ValidationGates:
+    require_pre_execution_approval: bool = False
+    require_external_api_approval: bool = False
+    require_high_cost_approval: bool = False
+    high_cost_threshold: float = 50.0
+
+
+class HumanValidationError(RuntimeError):
+    """Raised when execution must pause for human approval."""
+
+
+class HumanValidationController:
+    def __init__(self, gates: ValidationGates | None = None) -> None:
+        self.gates = gates or ValidationGates()
+        self._approvals: dict[str, bool] = {}
+
+    def grant_approval(self, token: str) -> None:
+        self._approvals[token] = True
+
+    def _require(self, token: str, reason: str) -> None:
+        if not self._approvals.get(token, False):
+            raise HumanValidationError(f"Execution paused pending human approval ({reason}). token={token}")
+
+    def validate_task(self, *, task_id: str, payload: dict[str, Any]) -> None:
+        if self.gates.require_pre_execution_approval:
+            self._require(f"task:{task_id}:execute", "pre_execution")
+
+        if self.gates.require_external_api_approval and payload.get("external_api", False):
+            self._require(f"task:{task_id}:external_api", "external_api")
+
+        estimated_cost = float(payload.get("estimated_cost", 0.0))
+        if self.gates.require_high_cost_approval and estimated_cost >= self.gates.high_cost_threshold:
+            self._require(f"task:{task_id}:cost", "high_cost")
