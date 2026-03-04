@@ -69,6 +69,8 @@ class TaskGraphEngine:
     def schedule_ready_tasks(self, limit: int | None = None) -> list[QueueTask]:
         scheduled: list[QueueTask] = []
         while self._ready and (limit is None or len(scheduled) < limit):
+            if not self.queue.can_schedule_new_tasks():
+                break
             _, task_id = heappop(self._ready)
             task = self._tasks[task_id]
             if task.status != "pending" or not self._dependencies_satisfied(task):

@@ -88,6 +88,9 @@ class AgentWorker:
         self._running = True
         while self._running:
             processed = self.process_once()
+            if self.queue.is_under_pressure():
+                time.sleep(self.poll_interval_seconds * 2)
+                continue
             if not processed:
                 time.sleep(self.poll_interval_seconds)
 
