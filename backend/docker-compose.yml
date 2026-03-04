@@ -1,8 +1,8 @@
 services:
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
     env_file:
       - .env.example
     volumes:
@@ -37,8 +37,8 @@ services:
 
   worker:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
     env_file:
       - .env.example
     command: celery -A main.celery_app worker -Q agents --loglevel=info
