@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Any, Callable
 
 import httpx
 
+from governance.human_validation import HumanValidationController, HumanValidationError, ValidationGates
 from models.schemas import NodeConfig
 from tools.browser_tools import browse_website
 from tools.circuit_breaker import CircuitOpenError, circuit_breakers
@@ -18,6 +20,16 @@ from tools.search_tools import web_search
 from tools.tool_ids import normalize_tool_ids
 
 ToolFn = Callable[..., str]
+
+
+HUMAN_VALIDATION = HumanValidationController(
+    ValidationGates(require_external_api_approval=True, require_high_cost_approval=True, high_cost_threshold=100.0)
+)
+
+
+def _approval_token(prefix: str, *parts: str) -> str:
+    digest = hashlib.sha1("|".join(parts).encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}:{digest}"
 
 
 def _filesystem_read(path: str) -> str:
@@ -39,6 +51,15 @@ def _filesystem_write(path: str, content: str) -> str:
 
 
 def _api_call(url: str, method: str = "GET", payload_json: str = "") -> str:
+    token = _approval_token("external_api", method.upper(), url)
+    try:
+        HUMAN_VALIDATION.request_approval(
+            token=token,
+            reason="external_api",
+            payload={"url": url, "method": method.upper(), "operation": "api_call"},
+        )
+    except HumanValidationError as exc:
+        return str(exc)
     payload: dict[str, Any] | None = None
     if payload_json:
         try:
@@ -98,6 +119,17 @@ TOOL_REGISTRY: dict[str, list[tuple[str, ToolFn]]] = {
 
 def _guarded_tool(tool_name: str, tool_callable: ToolFn) -> ToolFn:
     def _wrapped(*args: Any, **kwargs: Any) -> str:
+        estimated_cost = float(kwargs.get("estimated_cost", 0.0) or 0.0)
+        if estimated_cost >= HUMAN_VALIDATION.gates.high_cost_threshold:
+            token = _approval_token("high_cost", tool_name, str(estimated_cost))
+            try:
+                HUMAN_VALIDATION.request_approval(
+                    token=token,
+                    reason="high_cost",
+                    payload={"tool": tool_name, "estimated_cost": estimated_cost, "operation": "tool_invoke"},
+                )
+            except HumanValidationError as exc:
+                return str(exc)
         try:
             return circuit_breakers.invoke(tool_name, tool_callable, *args, **kwargs)
         except CircuitOpenError as exc:

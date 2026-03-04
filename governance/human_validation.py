@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from governance.approval_queue import ApprovalQueue, get_approval_queue
+
 
 @dataclass(slots=True)
 class ValidationGates:
@@ -19,28 +21,37 @@ class HumanValidationError(RuntimeError):
 
 
 class HumanValidationController:
-    def __init__(self, gates: ValidationGates | None = None) -> None:
+    def __init__(self, gates: ValidationGates | None = None, approval_queue: ApprovalQueue | None = None) -> None:
         self.gates = gates or ValidationGates()
-        self._approvals: dict[str, bool] = {}
+        self.approval_queue = approval_queue or get_approval_queue()
 
-    def grant_approval(self, token: str) -> None:
-        self._approvals[token] = True
+    def grant_approval(self, token: str, reviewer: str = "system", comment: str | None = None) -> None:
+        self.approval_queue.request_approval(token=token, reason="manual_grant")
+        self.approval_queue.record_decision(token=token, decision="approved", reviewer=reviewer, comment=comment)
 
-    def _require(self, token: str, reason: str) -> None:
-        if not self._approvals.get(token, False):
-            raise HumanValidationError(f"Execution paused pending human approval ({reason}). token={token}")
+    def reject_approval(self, token: str, reviewer: str, comment: str | None = None) -> None:
+        self.approval_queue.request_approval(token=token, reason="manual_reject")
+        self.approval_queue.record_decision(token=token, decision="rejected", reviewer=reviewer, comment=comment)
 
-    def request_approval(self, *, token: str, reason: str) -> None:
+    def _require(self, token: str, reason: str, payload: dict[str, Any] | None = None) -> None:
+        item = self.approval_queue.request_approval(token=token, reason=reason, payload=payload)
+        if item.status == "approved":
+            return
+        if item.status == "rejected":
+            raise HumanValidationError(f"Execution blocked by human rejection ({reason}). token={token}")
+        raise HumanValidationError(f"Execution paused pending human approval ({reason}). token={token}")
+
+    def request_approval(self, *, token: str, reason: str, payload: dict[str, Any] | None = None) -> None:
         """Trigger an explicit human approval gate for non-policy runtime safeguards."""
-        self._require(token, reason)
+        self._require(token, reason, payload=payload)
 
     def validate_task(self, *, task_id: str, payload: dict[str, Any]) -> None:
         if self.gates.require_pre_execution_approval:
-            self._require(f"task:{task_id}:execute", "pre_execution")
+            self._require(f"task:{task_id}:execute", "pre_execution", payload=payload)
 
         if self.gates.require_external_api_approval and payload.get("external_api", False):
-            self._require(f"task:{task_id}:external_api", "external_api")
+            self._require(f"task:{task_id}:external_api", "external_api", payload=payload)
 
         estimated_cost = float(payload.get("estimated_cost", 0.0))
         if self.gates.require_high_cost_approval and estimated_cost >= self.gates.high_cost_threshold:
-            self._require(f"task:{task_id}:cost", "high_cost")
+            self._require(f"task:{task_id}:cost", "high_cost", payload=payload)
