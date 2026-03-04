@@ -10,14 +10,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 RUN playwright install chromium
 
-# Copia backend
 COPY backend/ ./
 
-# Copia módulos da raiz do repo
+# Copy required root modules
 COPY governance ./governance
 COPY core ./core
-COPY communication ./communication
-COPY evaluation ./evaluation
 
 ENV PYTHONPATH=/app
 
