@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -11,15 +10,15 @@ from urllib.parse import urlparse
 
 import httpx
 
-from governance.human_validation import HumanValidationController, HumanValidationError, ValidationGates
-from models.schemas import NodeConfig
-from tools.browser_tools import browse_website, search_hotels
-from tools.circuit_breaker import CircuitOpenError, circuit_breakers
-from tools.excel_tools import create_excel_spreadsheet
-from tools.finance_tools import get_stock_data
-from tools.search_tools import web_search
-from tools.sandbox_runner import DEFAULT_SANDBOX_RUNNER, SandboxPolicy
-from tools.tool_ids import normalize_tool_ids
+from core.execution_gateway import ExecutionGateway, GatewayPolicy
+from backend.models.schemas import NodeConfig
+from backend.tools.browser_tools import browse_website, search_hotels
+from backend.tools.circuit_breaker import CircuitOpenError, circuit_breakers
+from backend.tools.excel_tools import create_excel_spreadsheet
+from backend.tools.finance_tools import get_stock_data
+from tools.sandbox_runner import SandboxPolicy
+from backend.tools.search_tools import web_search
+from backend.tools.tool_ids import normalize_tool_ids
 
 ToolFn = Callable[..., str]
 
@@ -28,20 +27,6 @@ ALLOWED_FILESYSTEM_ROOT = Path("/workspace").resolve()
 
 # blocked hosts for API calls (basic SSRF protection)
 BLOCKED_API_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0"}
-
-HUMAN_VALIDATION = HumanValidationController(
-    ValidationGates(
-        require_external_api_approval=True,
-        require_high_cost_approval=True,
-        high_cost_threshold=100.0,
-    )
-)
-
-
-def _approval_token(prefix: str, *parts: str) -> str:
-    digest = hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:12]
-    return f"{prefix}:{digest}"
-
 
 TOOL_SANDBOX_POLICIES: dict[str, SandboxPolicy] = {
     "web_search": SandboxPolicy(network_enabled=True),
@@ -86,27 +71,10 @@ def _filesystem_write(path: str, content: str) -> str:
 
 
 def _api_call(url: str, method: str = "GET", payload_json: str = "") -> str:
-
     parsed = urlparse(url)
 
     if parsed.hostname in BLOCKED_API_HOSTS:
         return "api_call error: blocked host"
-
-    token = _approval_token("external_api", method.upper(), url)
-
-    try:
-        HUMAN_VALIDATION.request_approval(
-            token=token,
-            reason="external_api",
-            payload={
-                "url": url,
-                "method": method.upper(),
-                "operation": "api_call",
-            },
-        )
-
-    except HumanValidationError as exc:
-        return str(exc)
 
     payload: dict[str, Any] | None = None
 
@@ -118,7 +86,6 @@ def _api_call(url: str, method: str = "GET", payload_json: str = "") -> str:
 
     try:
         with httpx.Client(timeout=20.0) as client:
-
             response = client.request(
                 method.upper(),
                 url,
@@ -141,7 +108,6 @@ def _api_call(url: str, method: str = "GET", payload_json: str = "") -> str:
 
 
 def _database_query(sql: str, database_path: str = "") -> str:
-
     sql_clean = sql.strip().lower()
 
     if not sql_clean.startswith("select"):
@@ -151,7 +117,6 @@ def _database_query(sql: str, database_path: str = "") -> str:
 
     try:
         with sqlite3.connect(db_path) as conn:
-
             cursor = conn.cursor()
             cursor.execute(sql)
 
@@ -194,61 +159,41 @@ TOOL_REGISTRY: dict[str, list[tuple[str, ToolFn]]] = {
 }
 
 
-def _guarded_tool(tool_name: str, tool_callable: ToolFn) -> ToolFn:
-    def _wrapped(*args: Any, **kwargs: Any) -> str:
+def _gateway() -> ExecutionGateway:
+    return ExecutionGateway(
+        policy=GatewayPolicy(
+            require_approval_categories={"integration"},
+            blocked_tools=set(),
+            max_tool_cost=500.0,
+            max_risk_level="high",
+        )
+    )
 
+
+def _guarded_tool(tool_name: str, tool_callable: ToolFn, gateway: ExecutionGateway) -> ToolFn:
+    def _wrapped(*args: Any, **kwargs: Any) -> str:
         estimated_cost = float(kwargs.pop("estimated_cost", 0.0) or 0.0)
 
-        if estimated_cost >= HUMAN_VALIDATION.gates.high_cost_threshold:
-
-            token = _approval_token(
-                "high_cost",
-                tool_name,
-                str(estimated_cost),
-            )
-
-            try:
-                HUMAN_VALIDATION.request_approval(
-                    token=token,
-                    reason="high_cost",
-                    payload={
-                        "tool": tool_name,
-                        "estimated_cost": estimated_cost,
-                        "operation": "tool_invoke",
-                    },
-                )
-
-            except HumanValidationError as exc:
-                return str(exc)
-
         try:
-
-            sandbox_policy = TOOL_SANDBOX_POLICIES.get(
-                tool_name,
-                SandboxPolicy(network_enabled=False),
-            )
-
-            def _sandbox_invocation() -> str:
-
-                sandbox_result = DEFAULT_SANDBOX_RUNNER.run_callable(
-                    tool_callable,
-                    *args,
-                    policy=sandbox_policy,
-                    **kwargs,
-                )
-
-                if not sandbox_result.ok:
-                    return f"{tool_name} sandbox error: {sandbox_result.error}"
-
-                return str(sandbox_result.output)
-
             return circuit_breakers.invoke(
                 tool_name,
-                _sandbox_invocation,
+                lambda: str(
+                    gateway.execute_agent_action(
+                        tool_name=tool_name,
+                        category="integration" if tool_name == "api_call" else "tool",
+                        handler=tool_callable,
+                        args=args,
+                        kwargs=kwargs,
+                        estimated_cost=estimated_cost,
+                        risk_level="medium" if tool_name == "api_call" else "low",
+                        sandbox_policy=TOOL_SANDBOX_POLICIES.get(tool_name, SandboxPolicy(network_enabled=False)),
+                    )
+                ),
             )
-
         except CircuitOpenError as exc:
             return f"{tool_name} disabled by circuit breaker: {exc}"
+        except Exception as exc:  # noqa: BLE001
+            return str(exc)
 
     _wrapped.__name__ = tool_name
 
@@ -267,21 +212,14 @@ def resolve_tools(agent_config: NodeConfig) -> list[Any]:
 
     resolved: list[Any] = []
     seen: set[str] = set()
+    gateway = _gateway()
 
     for tool_id in normalized:
-
         for tool_name, tool_callable in TOOL_REGISTRY.get(tool_id, []):
-
             if tool_name in seen:
                 continue
 
-            resolved.append(
-                _guarded_tool(
-                    tool_name,
-                    tool_callable,
-                )
-            )
-
+            resolved.append(_guarded_tool(tool_name, tool_callable, gateway))
             seen.add(tool_name)
 
     return resolved
