@@ -38,3 +38,18 @@ def test_context_manager_chunks_large_goal_input():
 
     chunk_count = sum(1 for item in context if item.kind in {"goal", "chunk"})
     assert chunk_count >= 2
+
+
+def test_assemble_context_pipeline_respects_budget():
+    memory = VectorMemory()
+    very_long = " ".join(["incident"] * 1500)
+    memory.store_knowledge({"history": very_long})
+    memory.store_task_result("3", {"summary": "Prior rollback fixed latency spikes"})
+
+    manager = LLMContextManager(memory=memory, config=ContextWindowConfig(max_context_tokens=700, reserved_response_tokens=300))
+    context = manager.assemble_context(user_input=["stabilize incident handling"], extra_records=[])
+
+    assert context
+    assert any(item.kind == "summary" for item in context)
+    total_tokens = sum(manager._estimate_tokens(manager._record_text(item)) for item in context)
+    assert total_tokens <= manager.config.prompt_budget_tokens
