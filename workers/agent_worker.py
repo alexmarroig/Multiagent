@@ -106,6 +106,9 @@ class AgentWorker:
         while self._running:
             self._emit_heartbeat()
             processed = self.process_once()
+            if self.queue.is_under_pressure():
+                time.sleep(self.poll_interval_seconds * 2)
+                continue
             if not processed:
                 time.sleep(self.poll_interval_seconds)
 
