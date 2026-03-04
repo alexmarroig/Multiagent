@@ -8,7 +8,7 @@ services:
     env_file:
       - .env.example
     environment:
-      PYTHONPATH: /app
+      PYTHONPATH: /app/backend:/app
     volumes:
       - ./credentials:/app/credentials
       - ./outputs:/app/outputs
@@ -25,7 +25,7 @@ services:
     env_file:
       - .env.example
     environment:
-      PYTHONPATH: /app
+      PYTHONPATH: /app/backend:/app
     command: celery -A main.celery_app worker -Q agents --loglevel=info
     depends_on:
       - redis
