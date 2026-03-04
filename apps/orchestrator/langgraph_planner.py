@@ -346,11 +346,7 @@ def generate_plan(
     planning_context: list[str] = []
 
     if experience_store is not None:
-        similar_records = experience_store.query_similar(
-            cleaned_objective,
-            limit=3,
-            kinds={"task_outcome", "success_metrics", "execution_trace", "evaluation"},
-        )
+        similar_records = experience_store.retrieve_for_planning(cleaned_objective, limit=3)
         for record in similar_records:
             summary = record.payload.get("task_id") or record.payload.get("goal") or record.kind
             planning_context.append(f"Histórico similar: {summary}")

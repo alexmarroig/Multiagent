@@ -43,6 +43,52 @@ class ExperienceStore:
     def store_task_outcome(self, task_id: str, outcome: dict[str, Any]) -> ExperienceRecord:
         return self._store("task_outcome", {"task_id": task_id, "outcome": outcome})
 
+    def record_task_outcome(self, *, task_id: str, agent_id: str, success: bool, strategy_id: str | None = None) -> ExperienceRecord:
+        return self._store(
+            "task_outcome",
+            {
+                "task_id": task_id,
+                "agent_id": agent_id,
+                "success": success,
+                "strategy_id": strategy_id,
+            },
+        )
+
+    def record_execution_latency(self, *, task_id: str, agent_id: str, latency: float) -> ExperienceRecord:
+        return self._store(
+            "execution_latency",
+            {"task_id": task_id, "agent_id": agent_id, "latency": max(0.0, float(latency))},
+        )
+
+    def record_tool_usage(
+        self,
+        *,
+        task_id: str,
+        agent_id: str,
+        tool_name: str,
+        success: bool | None = None,
+    ) -> ExperienceRecord:
+        return self._store(
+            "tool_usage",
+            {
+                "task_id": task_id,
+                "agent_id": agent_id,
+                "tool_name": tool_name,
+                "success": success,
+            },
+        )
+
+    def record_error_rate(self, *, task_id: str, agent_id: str, has_error: bool, error_type: str | None = None) -> ExperienceRecord:
+        return self._store(
+            "error_rate",
+            {
+                "task_id": task_id,
+                "agent_id": agent_id,
+                "has_error": has_error,
+                "error_type": error_type,
+            },
+        )
+
     def store_agent_decision(self, decision: dict[str, Any]) -> ExperienceRecord:
         return self._store("agent_decision", decision)
 
@@ -75,6 +121,15 @@ class ExperienceStore:
 
         ranked = sorted(filtered, key=lambda record: cosine(query_embedding, record.embedding), reverse=True)
         return ranked[: max(1, limit)]
+
+    def retrieve_for_planning(self, objective: str, *, limit: int = 5) -> list[ExperienceRecord]:
+        """Fetch relevant past experiences before plan generation."""
+
+        return self.query_similar(
+            objective,
+            limit=limit,
+            kinds={"task_outcome", "execution_latency", "tool_usage", "error_rate", "success_metrics", "evaluation"},
+        )
 
     def all_records(self) -> list[ExperienceRecord]:
         return list(self._records)

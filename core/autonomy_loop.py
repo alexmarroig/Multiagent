@@ -147,6 +147,29 @@ class AutonomousPlanningLoop:
                 }
             )
             success = self.performance_feedback.record_execution({**result, "task_id": task.task_id})
+            self.experience_store.record_task_outcome(
+                task_id=task.task_id,
+                agent_id=str(result.get("agent_id", "unknown")),
+                success=success,
+                strategy_id=result.get("strategy_id"),
+            )
+            self.experience_store.record_execution_latency(
+                task_id=task.task_id,
+                agent_id=str(result.get("agent_id", "unknown")),
+                latency=float(result.get("execution_time", 0.0)),
+            )
+            self.experience_store.record_tool_usage(
+                task_id=task.task_id,
+                agent_id=str(result.get("agent_id", "unknown")),
+                tool_name=str(result.get("tool", result.get("tool_id", "unknown"))),
+                success=success,
+            )
+            self.experience_store.record_error_rate(
+                task_id=task.task_id,
+                agent_id=str(result.get("agent_id", "unknown")),
+                has_error=bool(result.get("error")) or (not success),
+                error_type=str(result.get("error")) if result.get("error") else None,
+            )
             self.experience_store.store_success_metrics(
                 {
                     "task_id": task.task_id,
