@@ -10,6 +10,7 @@ from agents.communication_bus import CommunicationBus
 from goals.goal_manager import GoalManager
 from memory.vector_memory import VectorMemory
 from autonomy.task_decomposer import TaskDecomposer
+from governance.control_plane import validation_controller
 from orchestrator.task_queue import QueuedTask, TaskQueue
 
 
@@ -141,6 +142,16 @@ class AutonomousAgentLoop:
                 "payload": task.payload,
                 "message": inbox_message,
             }
+            task_context = {
+                **task.payload,
+                "estimated_cost": float(task.payload.get("estimated_cost", task.payload.get("cost", 0.0))),
+                "external_api": bool(
+                    task.payload.get("external_api")
+                    or task.payload.get("requires_external_api")
+                    or task.payload.get("has_external_call")
+                ),
+            }
+            validation_controller.validate_task(task_id=task.task_id, payload=task_context)
             result = self.execute_fn(payload)
             output = {
                 "task_id": task.task_id,

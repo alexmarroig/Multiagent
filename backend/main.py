@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes_agents import router as agents_router
 from api.routes_auth import router as auth_router
 from api.routes_flows import router as flows_router
+from api.routes_governance import router as governance_router
 from api.routes_history import router as history_router
 from api.routes_metrics import router as metrics_router
 from api.routes_tools import router as tools_router
@@ -78,6 +79,7 @@ app.include_router(flows_router, prefix="/api/flows", tags=["Flows"])
 app.include_router(history_router, prefix="/api/history", tags=["History"])
 app.include_router(metrics_router)
 app.include_router(tools_router)
+app.include_router(governance_router)
 app.include_router(ws_router)
 app.include_router(system_health_router)
 
