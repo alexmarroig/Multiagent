@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any, Protocol
 
 from communication.event_bus import Event, EventBus
@@ -51,6 +51,7 @@ class AgentWorker:
         task_handler: TaskHandler,
         result_store: ResultStore | None = None,
         poll_interval_seconds: float = 0.2,
+        heartbeat_interval_seconds: float = 1.0,
     ) -> None:
         self.worker_id = worker_id
         self.queue = queue
@@ -58,16 +59,32 @@ class AgentWorker:
         self.task_handler = task_handler
         self.result_store = result_store or InMemoryResultStore()
         self.poll_interval_seconds = max(0.01, poll_interval_seconds)
+        self.heartbeat_interval_seconds = max(0.05, heartbeat_interval_seconds)
         self.telemetry = WorkerTelemetry(worker_id=worker_id)
         self._running = False
         self._thread: threading.Thread | None = None
+        self._last_heartbeat = 0.0
+
+    def _emit_heartbeat(self) -> None:
+        now = time.time()
+        if now - self._last_heartbeat < self.heartbeat_interval_seconds:
+            return
+        self._last_heartbeat = now
+        self.event_bus.publish_event(
+            Event(topic="worker.heartbeat", payload={"worker_id": self.worker_id, "timestamp": now})
+        )
 
     def process_once(self) -> bool:
         task = self.queue.dequeue_task(timeout_seconds=1)
         if task is None:
             return False
 
-        self.event_bus.publish_event(Event(topic="worker.task_started", payload={"worker_id": self.worker_id, "task_id": task.task_id}))
+        self.event_bus.publish_event(
+            Event(
+                topic="worker.task_started",
+                payload={"worker_id": self.worker_id, "task_id": task.task_id, "task": asdict(task)},
+            )
+        )
         try:
             result = self.task_handler.execute(task)
             self.result_store.save_result(task, result)
@@ -87,6 +104,7 @@ class AgentWorker:
     def run_forever(self) -> None:
         self._running = True
         while self._running:
+            self._emit_heartbeat()
             processed = self.process_once()
             if not processed:
                 time.sleep(self.poll_interval_seconds)
