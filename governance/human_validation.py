@@ -30,6 +30,10 @@ class HumanValidationController:
         if not self._approvals.get(token, False):
             raise HumanValidationError(f"Execution paused pending human approval ({reason}). token={token}")
 
+    def request_approval(self, *, token: str, reason: str) -> None:
+        """Trigger an explicit human approval gate for non-policy runtime safeguards."""
+        self._require(token, reason)
+
     def validate_task(self, *, task_id: str, payload: dict[str, Any]) -> None:
         if self.gates.require_pre_execution_approval:
             self._require(f"task:{task_id}:execute", "pre_execution")
