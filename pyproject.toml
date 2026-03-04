@@ -1,0 +1,15 @@
+[project]
+name = "agentos"
+version = "0.1.0"
+description = "Enterprise Autonomous Agent Operating System"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agentos*"]
