@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 import uuid
@@ -11,6 +12,7 @@ from typing import Any, Callable
 from communication.event_bus import Event, EventBus
 from core.task_queue import DistributedTaskQueue, QueueTask
 from workers.agent_worker import AgentWorker
+from monitoring.structured_logging import log_event
 
 ResourceProbe = Callable[[AgentWorker], dict[str, Any] | None]
 WorkerFactory = Callable[[str], AgentWorker]
@@ -122,6 +124,7 @@ class WorkerWatchdog:
         replacement.start_background()
         self._workers[replacement.worker_id] = WorkerState(worker=replacement, last_heartbeat=self.time_fn())
 
+        log_event(logging.getLogger(__name__), component="watchdog", event="worker_recovery", severity="warning", worker_id=worker_id, issue=issue)
         self.event_bus.publish_event(
             Event(
                 topic="system.alert",
