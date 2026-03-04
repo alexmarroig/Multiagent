@@ -15,9 +15,23 @@ from tools.circuit_breaker import CircuitOpenError, circuit_breakers
 from tools.excel_tools import create_excel_spreadsheet
 from tools.finance_tools import get_stock_data
 from tools.search_tools import web_search
+from tools.sandbox_runner import DEFAULT_SANDBOX_RUNNER, SandboxPolicy
 from tools.tool_ids import normalize_tool_ids
 
 ToolFn = Callable[..., str]
+
+
+TOOL_SANDBOX_POLICIES: dict[str, SandboxPolicy] = {
+    "web_search": SandboxPolicy(network_enabled=True),
+    "browse_website": SandboxPolicy(network_enabled=True),
+    "get_stock_data": SandboxPolicy(network_enabled=True),
+    "search_hotels": SandboxPolicy(network_enabled=True),
+    "api_call": SandboxPolicy(network_enabled=True),
+    "create_excel_spreadsheet": SandboxPolicy(network_enabled=False),
+    "filesystem_read": SandboxPolicy(network_enabled=False),
+    "filesystem_write": SandboxPolicy(network_enabled=False),
+    "database_query": SandboxPolicy(network_enabled=False),
+}
 
 
 def _filesystem_read(path: str) -> str:
@@ -99,7 +113,20 @@ TOOL_REGISTRY: dict[str, list[tuple[str, ToolFn]]] = {
 def _guarded_tool(tool_name: str, tool_callable: ToolFn) -> ToolFn:
     def _wrapped(*args: Any, **kwargs: Any) -> str:
         try:
-            return circuit_breakers.invoke(tool_name, tool_callable, *args, **kwargs)
+            sandbox_policy = TOOL_SANDBOX_POLICIES.get(tool_name, SandboxPolicy())
+
+            def _sandbox_invocation() -> str:
+                sandbox_result = DEFAULT_SANDBOX_RUNNER.run_callable(
+                    tool_callable,
+                    *args,
+                    policy=sandbox_policy,
+                    **kwargs,
+                )
+                if not sandbox_result.ok:
+                    return f"{tool_name} sandbox error: {sandbox_result.error}"
+                return str(sandbox_result.output)
+
+            return circuit_breakers.invoke(tool_name, _sandbox_invocation)
         except CircuitOpenError as exc:
             return f"{tool_name} disabled by circuit breaker: {exc}"
 
