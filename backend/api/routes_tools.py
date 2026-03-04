@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 
 from models.schemas import CallConfig, ExcelConfig, MeetingConfig, TravelConfig
 from tools.browser_tools import search_hotels
+from tools.circuit_breaker import CircuitOpenError, circuit_breakers
 from tools.calendar_tools import schedule_meeting
 from tools.excel_tools import create_excel_spreadsheet
 from tools.phone_tools import make_phone_call
@@ -68,11 +69,16 @@ def _resolve_artifact_path(
 
 @router.post("/excel/create")
 async def create_excel(config: ExcelConfig):
-    raw_output = create_excel_spreadsheet(
-        data_json=json.dumps(config.data, ensure_ascii=False),
-        title=config.title,
-        filename=config.filename,
-    )
+    try:
+        raw_output = circuit_breakers.invoke(
+            "create_excel_spreadsheet",
+            create_excel_spreadsheet,
+            data_json=json.dumps(config.data, ensure_ascii=False),
+            title=config.title,
+            filename=config.filename,
+        )
+    except CircuitOpenError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     is_json, payload = _parse_excel_tool_result(raw_output)
 
@@ -99,21 +105,43 @@ async def download_artifact(artifact_id: str | None = None, artifact_path: str |
 
 @router.post("/calendar/schedule")
 async def create_meeting(config: MeetingConfig) -> dict:
-    return schedule_meeting(
-        title=config.title,
-        start_datetime=config.start_datetime,
-        end_datetime=config.end_datetime,
-        description=config.description,
-        attendees_json=json.dumps(config.attendees, ensure_ascii=False),
-    )
+    try:
+        return circuit_breakers.invoke(
+            "schedule_meeting",
+            schedule_meeting,
+            title=config.title,
+            start_datetime=config.start_datetime,
+            end_datetime=config.end_datetime,
+            description=config.description,
+            attendees_json=json.dumps(config.attendees, ensure_ascii=False),
+        )
+    except CircuitOpenError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/phone/call")
 async def phone_call(config: CallConfig) -> dict:
-    return make_phone_call(config.to_number, config.script, config.language)
+    try:
+        return circuit_breakers.invoke(
+            "make_phone_call", make_phone_call, config.to_number, config.script, config.language
+        )
+    except CircuitOpenError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/travel/search")
 async def travel_search(config: TravelConfig) -> dict:
-    parsed = json.loads(search_hotels(config.destination, config.checkin, config.checkout, config.adults))
+    try:
+        raw = circuit_breakers.invoke(
+            "search_hotels",
+            search_hotels,
+            config.destination,
+            config.checkin,
+            config.checkout,
+            config.adults,
+        )
+    except CircuitOpenError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    parsed = json.loads(raw)
     return {"options": parsed.get("options", []), "meta": parsed}
