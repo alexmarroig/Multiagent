@@ -1,61 +1,15 @@
 """Governance control-plane endpoints for human approvals."""
-"""Governance approval APIs."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-
-from governance.approval_queue import get_approval_queue
-
-router = APIRouter(tags=["governance"])
-
-
-class ApprovalDecisionRequest(BaseModel):
-    token: str = Field(min_length=1)
-    reviewer: str = Field(min_length=1)
-    comment: str | None = None
-
-
-@router.get("/governance/pending")
-async def list_pending_approvals() -> dict[str, list[dict[str, Any]]]:
-    queue = get_approval_queue()
-    return {"pending": queue.pending()}
-
-
-@router.post("/governance/approve")
-async def approve_request(body: ApprovalDecisionRequest) -> dict[str, Any]:
-    queue = get_approval_queue()
-    try:
-        item = queue.record_decision(
-            token=body.token,
-            decision="approved",
-            reviewer=body.reviewer,
-            comment=body.comment,
-        )
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return {"status": "approved", "item": item.to_dict()}
-
-
-@router.post("/governance/reject")
-async def reject_request(body: ApprovalDecisionRequest) -> dict[str, Any]:
-    queue = get_approval_queue()
-    try:
-        item = queue.record_decision(
-            token=body.token,
-            decision="rejected",
-            reviewer=body.reviewer,
-            comment=body.comment,
-        )
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return {"status": "rejected", "item": item.to_dict()}
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from auth.dependencies import get_current_user
 from governance.control_plane import approval_queue
+from security.rbac import Permission, RBACAuthorizationError, RBACResource, rbac_middleware
 
 router = APIRouter(prefix="/governance", tags=["governance"])
 
@@ -66,8 +20,26 @@ class DecisionPayload(BaseModel):
     comment: str = ""
 
 
+def _authorize_governance(user: dict[str, Any], permission: Permission, action: str) -> None:
+    context = rbac_middleware.context_from_user(user, fallback_roles=("auditor",))
+    try:
+        rbac_middleware.authorize(
+            context=context,
+            permission=permission,
+            resource=RBACResource(
+                resource_type="governance",
+                action=action,
+                tenant_id=user.get("tenant_id") or user.get("organization_id"),
+                scope="tenant",
+            ),
+        )
+    except RBACAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
 @router.get("/pending")
-async def list_pending() -> list[dict[str, Any]]:
+async def list_pending(user: dict = Depends(get_current_user)) -> list[dict[str, Any]]:
+    _authorize_governance(user, Permission.GOVERNANCE_READ, "list_pending")
     pending = approval_queue.pending()
     return [
         {
@@ -91,7 +63,8 @@ async def list_pending() -> list[dict[str, Any]]:
 
 
 @router.post("/approve")
-async def approve_request(payload: DecisionPayload) -> dict[str, Any]:
+async def approve_request(payload: DecisionPayload, user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    _authorize_governance(user, Permission.GOVERNANCE_DECIDE, "approve")
     request = approval_queue.get(payload.token)
     if request is None:
         raise HTTPException(status_code=404, detail="Approval token not found")
@@ -106,7 +79,8 @@ async def approve_request(payload: DecisionPayload) -> dict[str, Any]:
 
 
 @router.post("/reject")
-async def reject_request(payload: DecisionPayload) -> dict[str, Any]:
+async def reject_request(payload: DecisionPayload, user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    _authorize_governance(user, Permission.GOVERNANCE_DECIDE, "reject")
     request = approval_queue.get(payload.token)
     if request is None:
         raise HTTPException(status_code=404, detail="Approval token not found")
