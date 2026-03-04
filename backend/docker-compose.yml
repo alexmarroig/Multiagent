@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   backend:
     build:
@@ -5,6 +7,8 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env.example
+    environment:
+      PYTHONPATH: /app
     volumes:
       - ./credentials:/app/credentials
       - ./outputs:/app/outputs
@@ -14,16 +18,17 @@ services:
       - redis
       - chromadb
 
-  # Placeholder only: this container does not build/serve apps/web.
-  # Run the real frontend from the monorepo root with `pnpm dev:web`.
-  frontend:
-    image: node:20-alpine
-    working_dir: /workspace
+  worker:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env.example
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    command: sh -c "echo 'Frontend container placeholder para integração AgentOS' && sleep infinity"
-    ports:
-      - "3000:3000"
+      PYTHONPATH: /app
+    command: celery -A main.celery_app worker -Q agents --loglevel=info
+    depends_on:
+      - redis
 
   redis:
     image: redis:7-alpine
@@ -35,12 +40,12 @@ services:
     ports:
       - "8001:8000"
 
-  worker:
-    build:
-      context: ..
-      dockerfile: backend/Dockerfile
-    env_file:
-      - .env.example
-    command: celery -A main.celery_app worker -Q agents --loglevel=info
-    depends_on:
-      - redis
+  # Placeholder container
+  frontend:
+    image: node:20-alpine
+    working_dir: /workspace
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    command: sh -c "echo 'Frontend container placeholder para integração AgentOS' && sleep infinity"
+    ports:
+      - "3000:3000"
