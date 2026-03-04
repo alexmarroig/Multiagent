@@ -4,6 +4,8 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  schedule:
+    - cron: "0 5 * * 1"
 
 jobs:
   reliability:
@@ -47,6 +49,21 @@ jobs:
 
       - name: Run system audits
         run: python -m system_audit.audit_runner > audit_report.json
+
+      - name: Block audit regressions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("audit_report.json").read_text())
+          if report.get("overall_status") != "OK":
+            raise SystemExit(f"Audit regression detected: {report.get('overall_status')}")
+          PY
+
+      - name: Run chaos tests
+        if: github.event_name == 'schedule'
+        run: pytest -q tests/chaos
 
       - name: Upload reliability artifacts
         if: always()
