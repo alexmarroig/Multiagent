@@ -44,12 +44,25 @@ class EdgeConfig(BaseModel):
     target: str
 
 
+
+
+class AutonomyConfig(BaseModel):
+    enabled: bool = True
+    objective: str = ""
+    max_iterations: int = 8
+    max_cost: float = 5.0
+    max_runtime_seconds: int = 900
+    completion_keywords: list[str] = Field(default_factory=list)
+    schedule_every_minutes: int | None = None
+
+
 class FlowConfig(BaseModel):
     session_id: str = ""
     user_id: str = ""
     nodes: list[NodeConfig] = Field(default_factory=list)
     edges: list[EdgeConfig] = Field(default_factory=list)
     inputs: dict[str, Any] = Field(default_factory=dict)
+    autonomy: AutonomyConfig = Field(default_factory=AutonomyConfig)
 
 
 class AgentEvent(BaseModel):
