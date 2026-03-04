@@ -19,6 +19,7 @@ from api.routes_tools import router as tools_router
 from api.websocket import router as ws_router
 from config import current_pid, settings
 from observability.logging import log_structured
+from monitoring.system_health import router as system_health_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -78,6 +79,7 @@ app.include_router(history_router, prefix="/api/history", tags=["History"])
 app.include_router(metrics_router)
 app.include_router(tools_router)
 app.include_router(ws_router)
+app.include_router(system_health_router)
 
 
 @app.get("/health")
