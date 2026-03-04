@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Protocol
 
 from communication.message_bus import Message, MessageBus
@@ -123,7 +123,7 @@ class AutonomousPlanningLoop:
                     "cost": 0.0,
                 }
             else:
-                result = self.executor.execute(task)
+                result = self._normalize_executor_result(task.task_id, self.executor.execute(task))
 
             executed += 1
             accumulated_cost += float(result.get("cost", 0.0))
@@ -203,6 +203,19 @@ class AutonomousPlanningLoop:
 
         if executed == 0 and self.task_graph.pending_count() == 0:
             self.message_bus.broadcast(Message(topic="autonomy.idle", payload={"goals": goals}))
-            return LoopResult(executed_tasks=0, cost=0.0, halt=True).__dict__
+            return asdict(LoopResult(executed_tasks=0, cost=0.0, halt=True))
 
-        return LoopResult(executed_tasks=executed, cost=accumulated_cost).__dict__
+        return asdict(LoopResult(executed_tasks=executed, cost=accumulated_cost))
+
+    @staticmethod
+    def _normalize_executor_result(task_id: str, result: object) -> dict:
+        if isinstance(result, dict):
+            return result
+        return {
+            "task_id": task_id,
+            "success": False,
+            "status": "malformed_result",
+            "error": f"executor returned {type(result).__name__}, expected dict",
+            "raw_result": str(result),
+            "cost": 0.0,
+        }
