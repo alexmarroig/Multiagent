@@ -9,6 +9,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from monitoring.structured_logging import log_event
+
 
 @dataclass(slots=True)
 class QueueTask:
@@ -185,16 +187,8 @@ class DistributedTaskQueue:
         size = self.queue_size()
         if not self._scheduling_paused and size > self.queue_high_watermark:
             self._scheduling_paused = True
-            self._logger.warning(
-                "Queue pressure high: pending=%s exceeded high watermark=%s. Pausing scheduling and throttling workers.",
-                size,
-                self.queue_high_watermark,
-            )
+            log_event(self._logger, component="scheduler", event="queue_backpressure_on", severity="warning", pending=size, high_watermark=self.queue_high_watermark)
         elif self._scheduling_paused and size < self.queue_low_watermark:
             self._scheduling_paused = False
-            self._logger.info(
-                "Queue pressure normalized: pending=%s below low watermark=%s. Resuming scheduling.",
-                size,
-                self.queue_low_watermark,
-            )
+            log_event(self._logger, component="scheduler", event="queue_backpressure_off", severity="info", pending=size, low_watermark=self.queue_low_watermark)
         return self._scheduling_paused
