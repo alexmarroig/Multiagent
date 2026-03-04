@@ -11,6 +11,7 @@ import httpx
 
 from models.schemas import NodeConfig
 from tools.browser_tools import browse_website
+from tools.circuit_breaker import CircuitOpenError, circuit_breakers
 from tools.excel_tools import create_excel_spreadsheet
 from tools.finance_tools import get_stock_data
 from tools.search_tools import web_search
@@ -95,6 +96,17 @@ TOOL_REGISTRY: dict[str, list[tuple[str, ToolFn]]] = {
 }
 
 
+def _guarded_tool(tool_name: str, tool_callable: ToolFn) -> ToolFn:
+    def _wrapped(*args: Any, **kwargs: Any) -> str:
+        try:
+            return circuit_breakers.invoke(tool_name, tool_callable, *args, **kwargs)
+        except CircuitOpenError as exc:
+            return f"{tool_name} disabled by circuit breaker: {exc}"
+
+    _wrapped.__name__ = tool_name
+    return _wrapped
+
+
 def resolve_tools(agent_config: NodeConfig) -> list[Any]:
     """Resolve runtime tools for an agent config.
 
@@ -111,8 +123,7 @@ def resolve_tools(agent_config: NodeConfig) -> list[Any]:
         for tool_name, tool_callable in TOOL_REGISTRY.get(tool_id, []):
             if tool_name in seen:
                 continue
-            tool_callable.__name__ = tool_name
-            resolved.append(tool_callable)
+            resolved.append(_guarded_tool(tool_name, tool_callable))
             seen.add(tool_name)
 
     return resolved

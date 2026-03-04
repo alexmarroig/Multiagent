@@ -26,6 +26,10 @@ class InMemoryContext:
     def store_event(self, payload: dict) -> None:
         self.items.append({"kind": "event", "payload": payload})
 
+    def semantic_search(self, _query: str, limit: int = 5) -> list[dict]:
+        sliced = self.items[-limit:]
+        return [{"metadata": {"kind": "task_result"}, "document": str(item.get("payload", {}))} for item in sliced]
+
 
 def test_decomposer_builds_hierarchy_with_limits() -> None:
     decomposer = TaskDecomposer(
@@ -99,3 +103,30 @@ def test_agent_loop_enqueues_dynamic_subtasks_from_execution_result() -> None:
 
     assert result["iterations"] >= 1
     assert any("Investigar erro de integração" in item.get("description", "") for item in result["last_outputs"])
+
+
+def test_agent_loop_prepares_bounded_context_before_planning() -> None:
+    observed = {"context": []}
+
+    def planner_fn(_objective: str, context: list[dict]) -> list[QueuedTask]:
+        observed["context"] = context
+        return []
+
+    loop = AutonomousAgentLoop(
+        session_id="s-context",
+        objective="Resolver incidente de produção com histórico longo",
+        execute_fn=lambda _payload: {},
+        planner_fn=planner_fn,
+        guardrails=LoopGuardrails(max_iterations=1),
+    )
+    loop.memory = InMemoryContext()
+    huge_text = " ".join(["history"] * 2000)
+    loop.memory.items = [
+        {"metadata": {"kind": "task_result"}, "payload": {"objective": "base objective"}},
+        {"metadata": {"kind": "event"}, "payload": {"transcript": huge_text}},
+    ]
+
+    loop.run()
+
+    assert observed["context"]
+    assert any(item.get("metadata", {}).get("kind") == "summary" for item in observed["context"])
