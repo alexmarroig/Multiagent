@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from communication.event_bus import Event, EventBus
 from core.task_queue import DistributedTaskQueue, QueueTask
+from core.retry_engine import RetryEngine, get_default_retry_engine
 from monitoring.tracing import get_tracer
 
 
@@ -53,6 +54,7 @@ class AgentWorker:
         result_store: ResultStore | None = None,
         poll_interval_seconds: float = 0.2,
         heartbeat_interval_seconds: float = 1.0,
+        retry_engine: RetryEngine | None = None,
     ) -> None:
         self.worker_id = worker_id
         self.queue = queue
@@ -66,6 +68,7 @@ class AgentWorker:
         self._thread: threading.Thread | None = None
         self._last_heartbeat = 0.0
         self._tracer = get_tracer()
+        self.retry_engine = retry_engine or get_default_retry_engine()
 
     def _emit_heartbeat(self) -> None:
         now = time.time()
@@ -89,14 +92,19 @@ class AgentWorker:
                 )
             )
             try:
-                result = self.task_handler.execute(task)
+                result = self.retry_engine.execute(
+                    "task_execution",
+                    self.task_handler.execute,
+                    task,
+                    context={"worker_id": self.worker_id, "task_id": task.task_id, "task_name": task.name},
+                )
                 self.result_store.save_result(task, result)
                 self.queue.acknowledge_task(task)
                 self.telemetry.processed_tasks += 1
                 self.event_bus.report_completion(task_id=task.task_id, worker_id=self.worker_id, result=result)
             except Exception as exc:  # noqa: BLE001
                 self.telemetry.failed_tasks += 1
-                self.queue.fail_task(task, error=str(exc))
+                self.queue.fail_task(task, error=str(exc), exc=exc)
                 self.event_bus.publish_event(
                     Event(
                         topic="worker.task_failed",

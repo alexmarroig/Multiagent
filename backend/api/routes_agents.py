@@ -22,10 +22,30 @@ from orchestrator.crew_builder import ExecutionCancelledError, build_crew_from_c
 from orchestrator.event_stream import make_event, publish_event
 from orchestrator.task_queue import QueuedTask
 from scheduler.agent_scheduler import AgentScheduler
+from security.rbac import Permission, RBACAuthorizationError, RBACResource, rbac_middleware
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 logger = logging.getLogger("agentos-backend")
 agent_scheduler = AgentScheduler()
+
+
+
+def _authorize_agent_creation(user: dict[str, Any], tenant_id: str | None) -> None:
+    context = rbac_middleware.context_from_user(user, fallback_roles=("operator",))
+    resource_tenant = tenant_id or user.get("tenant_id") or user.get("organization_id")
+    try:
+        rbac_middleware.authorize(
+            context=context,
+            permission=Permission.AGENT_CREATE,
+            resource=RBACResource(
+                resource_type="agent",
+                action="create",
+                tenant_id=resource_tenant,
+                scope="tenant",
+            ),
+        )
+    except RBACAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 TERMINAL_STATUSES = {"done", "error", "cancelled"}
 RUNNING_EXECUTIONS: dict[str, asyncio.Task[Any]] = {}
@@ -206,6 +226,7 @@ async def run_flow(
     flow: FlowConfig,
     user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
+    _authorize_agent_creation(user, flow.inputs.get("tenant_id"))
     session_id = flow.session_id or str(uuid.uuid4())
     flow = flow.model_copy(update={"session_id": session_id, "user_id": user["id"]})
 

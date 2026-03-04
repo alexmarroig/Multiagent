@@ -7,15 +7,17 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
+from auth.dependencies import get_current_user
 from models.schemas import CallConfig, ExcelConfig, MeetingConfig, TravelConfig
 from tools.browser_tools import search_hotels
 from tools.circuit_breaker import CircuitOpenError, circuit_breakers
 from tools.calendar_tools import schedule_meeting
 from tools.excel_tools import create_excel_spreadsheet
 from tools.phone_tools import make_phone_call
+from security.rbac import Permission, RBACAuthorizationError, RBACResource, rbac_middleware
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
@@ -23,6 +25,24 @@ OUTPUT_DIR = Path(os.getenv("OUTPUT_DIR", "outputs")).resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _authorize_tool_invocation(user: dict[str, Any], tool_name: str) -> None:
+    context = rbac_middleware.context_from_user(user, fallback_roles=("operator",))
+    try:
+        rbac_middleware.authorize(
+            context=context,
+            permission=Permission.TOOL_INVOKE,
+            resource=RBACResource(
+                resource_type="tool",
+                action="invoke",
+                resource_id=tool_name,
+                tenant_id=user.get("tenant_id") or user.get("organization_id"),
+                scope="tenant",
+            ),
+        )
+    except RBACAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 def _parse_excel_tool_result(raw_output: str) -> tuple[bool, dict[str, Any]]:
@@ -68,7 +88,8 @@ def _resolve_artifact_path(
 
 
 @router.post("/excel/create")
-async def create_excel(config: ExcelConfig):
+async def create_excel(config: ExcelConfig, user: dict = Depends(get_current_user)):
+    _authorize_tool_invocation(user, "create_excel_spreadsheet")
     try:
         raw_output = circuit_breakers.invoke(
             "create_excel_spreadsheet",
@@ -104,7 +125,8 @@ async def download_artifact(artifact_id: str | None = None, artifact_path: str |
 
 
 @router.post("/calendar/schedule")
-async def create_meeting(config: MeetingConfig) -> dict:
+async def create_meeting(config: MeetingConfig, user: dict = Depends(get_current_user)) -> dict:
+    _authorize_tool_invocation(user, "schedule_meeting")
     try:
         return circuit_breakers.invoke(
             "schedule_meeting",
@@ -120,7 +142,8 @@ async def create_meeting(config: MeetingConfig) -> dict:
 
 
 @router.post("/phone/call")
-async def phone_call(config: CallConfig) -> dict:
+async def phone_call(config: CallConfig, user: dict = Depends(get_current_user)) -> dict:
+    _authorize_tool_invocation(user, "make_phone_call")
     try:
         return circuit_breakers.invoke(
             "make_phone_call", make_phone_call, config.to_number, config.script, config.language
@@ -130,7 +153,8 @@ async def phone_call(config: CallConfig) -> dict:
 
 
 @router.post("/travel/search")
-async def travel_search(config: TravelConfig) -> dict:
+async def travel_search(config: TravelConfig, user: dict = Depends(get_current_user)) -> dict:
+    _authorize_tool_invocation(user, "search_hotels")
     try:
         raw = circuit_breakers.invoke(
             "search_hotels",
