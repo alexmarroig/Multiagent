@@ -12,6 +12,10 @@ class QueuedTask:
     task_id: str
     agent_id: str
     description: str
+    parent_task_id: str | None = None
+    estimated_complexity: int = 1
+    required_tools: list[str] = field(default_factory=list)
+    expected_output_format: str = "text"
     payload: dict[str, Any] = field(default_factory=dict)
 
 
