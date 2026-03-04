@@ -29,11 +29,17 @@ class EventBus:
         else:
             self._subscribers[topic].append(callback)
 
+    def subscribe(self, topic: str, callback: Subscriber) -> None:
+        self.subscribe_event(topic, callback)
+
     def publish_event(self, event: Event) -> None:
         for callback in self._subscribers.get(event.topic, []):
             callback(event)
         for callback in self._wildcard_subscribers:
             callback(event)
+
+    def publish(self, topic: str, payload: dict[str, Any]) -> None:
+        self.publish_event(Event(topic=topic, payload=payload))
 
     def broadcast(self, payload: dict[str, Any]) -> None:
         self.publish_event(Event(topic="broadcast", payload=payload))

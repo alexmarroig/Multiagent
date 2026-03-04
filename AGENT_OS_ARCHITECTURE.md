@@ -1,78 +1,178 @@
-# AgentOS Architecture
+# AGENT_OS_ARCHITECTURE
 
-## Classification
+## 1) Objective
 
-**AUTONOMOUS AGENT OPERATING SYSTEM**
+This architecture defines a **production-grade Agent Operating System (Agent OS)** that supports:
 
-## System Architecture
+- distributed workers
+- durable task graphs
+- hierarchical supervision
+- adaptive scheduling
+- human-in-the-loop governance
+- guardrails and cost controls
 
-The platform is structured around a central runtime (`core/agent_runtime.py`) that governs lifecycle, budget control, and health visibility for all agents. The runtime executes the autonomy loop (`core/autonomy_loop.py`) in cycles and enforces explicit cost guardrails.
+The design is modular and maps directly to repository modules.
 
-Supporting subsystems:
+---
 
-- **Tool Layer**: `tools/tool_registry.py` centralizes dynamic tool registration and attaches tool handles to agents at runtime.
-- **Memory Layer**: `memory/vector_memory.py` stores results, decisions, knowledge, and environment snapshots with embedding-backed semantic retrieval.
-- **Coordination Layer**: `communication/message_bus.py` enables direct messaging, event broadcast, and task delegation.
-- **Execution Layer**: `tasks/task_graph.py` supports dependency-aware task execution with dynamic spawning, priorities, and parallel dispatch.
-- **Control Layer**: `scheduler/agent_scheduler.py` handles periodic jobs, goal monitoring, restart hooks, and background execution.
+## 2) Control Plane and Data Plane
 
-## Agent Lifecycle
+### Control Plane
+Responsible for policy, planning, scheduling, supervision, approvals, and safety:
 
-1. Runtime initializes baseline agent profiles.
-2. Tools are registered and attached according to each agent's role.
-3. Runtime executes autonomy cycles.
-4. Runtime resolves skill gaps and dynamically spawns specialized agents when required.
-5. Runtime continuously monitors cost, errors, and health.
-6. Runtime degrades/stops safely when guardrails are hit.
+- `core/orchestrator.py`
+- `core/autonomy_engine.py`
+- `core/scheduler.py`
+- `governance/policy_engine.py`
+- `governance/human_approval_service.py`
+- `governance/guardrails.py`
+- `scheduler/adaptive_scheduler.py`
+- `scheduler/queue_backpressure_controller.py`
 
-## Task Graph Engine
+### Data Plane
+Responsible for task execution, messaging, memory, and observability:
 
-The task graph supports:
+- `tasks/task_graph_engine.py`
+- `tasks/task_decomposition_engine.py`
+- `tasks/task_checkpoint_store.py`
+- `agents/planner_agent.py`
+- `agents/executor_agent.py`
+- `agents/verifier_agent.py`
+- `agents/supervisor_agent.py`
+- `tools/tool_registry.py`
+- `tools/sandbox_runner.py`
+- `communication/event_bus.py`
+- `communication/agent_mailbox.py`
+- `memory/vector_memory.py`
+- `memory/episodic_memory.py`
+- `memory/knowledge_store.py`
+- `monitoring/telemetry_service.py`
+- `monitoring/anomaly_detector.py`
+- `monitoring/alerts.py`
 
-- **Dependencies**: tasks only become ready after parent tasks complete.
-- **Dynamic Spawning**: downstream tasks can be emitted during execution.
-- **Priority Queues**: lower priority score executes first.
-- **Parallel Execution**: ready tasks can run via thread pool workers.
+---
 
-## Memory System
+## 3) Module Responsibilities
 
-Vector memory stores:
+### Core
 
-- task results
-- agent decisions
-- durable knowledge
-- environment state snapshots
+- **`core/orchestrator.py`**
+  - Entry point for each objective.
+  - Executes policy check -> optional human approval -> graph creation -> schedule generation -> execution -> guardrail enforcement.
+- **`core/autonomy_engine.py`**
+  - Runs execution windows.
+  - Emits runtime events and writes checkpoints for durability.
+- **`core/scheduler.py`**
+  - Scheduling kernel that combines adaptive ranking and backpressure controls.
+- **`core/load_manager.py`**
+  - Tracks distributed worker load and assigns work to least-loaded workers.
 
-Planners query semantic memory before plan generation to provide historical context, reducing repeated failure patterns and improving long-horizon continuity.
+### Agents
 
-## Tool Registry
+- **`agents/planner_agent.py`**: Converts objectives into executable plans.
+- **`agents/executor_agent.py`**: Performs tasks using registered tools.
+- **`agents/verifier_agent.py`**: Validates correctness and policy compliance.
+- **`agents/supervisor_agent.py`**: Oversees lower-level agents and escalates risks.
 
-The registry includes first-class support for:
+### Tasks
 
-- web search
-- browser automation
-- filesystem access
-- API execution
-- database queries
-- code execution
+- **`tasks/task_graph_engine.py`**: Durable dependency DAG, state transitions, and readiness handling.
+- **`tasks/task_decomposition_engine.py`**: Decomposes complex goals into bounded subtasks.
+- **`tasks/task_checkpoint_store.py`**: Persistent execution checkpoints for replay/recovery.
 
-All tools are registered centrally and can be attached dynamically to newly spawned agents.
+### Memory
 
-## Communication Bus
+- **`memory/vector_memory.py`**: Semantic recall for decisions, results, and context.
+- **`memory/episodic_memory.py`**: Ordered execution episodes for near-term continuity.
+- **`memory/knowledge_store.py`**: Durable structured facts and operational knowledge.
 
-Message bus capabilities:
+### Tools
 
-- point-to-point messaging
-- system-wide event broadcast
-- task delegation payloads between agents
+- **`tools/tool_registry.py`**: Central tool capability registry and policy-aware access control.
+- **`tools/sandbox_runner.py`**: Sandboxed command execution with bounded timeouts.
 
-This enables multi-agent collaboration patterns rather than isolated worker execution.
+### Communication
 
-## Scheduler
+- **`communication/event_bus.py`**: Pub/sub eventing for decoupled control and observability.
+- **`communication/agent_mailbox.py`**: Reliable per-agent async messaging.
 
-The scheduler executes autonomous control-plane jobs including:
+### Governance
 
-- periodic tasks
-- goal monitoring
-- automated agent restart checks
-- continuous background execution loops
+- **`governance/policy_engine.py`**: Preflight policy decisions and risk flags.
+- **`governance/human_approval_service.py`**: Approval gates for risky actions.
+- **`governance/guardrails.py`**: Runtime safety and cost controls.
+
+### Monitoring
+
+- **`monitoring/telemetry_service.py`**: Unified runtime telemetry events.
+- **`monitoring/anomaly_detector.py`**: Detects cost/error spikes.
+- **`monitoring/alerts.py`**: Emits alerts for policy, reliability, and budget incidents.
+
+### Adaptive Scheduling
+
+- **`scheduler/adaptive_scheduler.py`**: Priority/risk-aware dynamic scheduling.
+- **`scheduler/queue_backpressure_controller.py`**: Limits dispatch during saturation.
+
+---
+
+## 4) End-to-End Execution Flow
+
+1. Client submits objective to `Orchestrator`.
+2. `PolicyEngine` evaluates action legality/risk.
+3. `HumanApprovalService` gates high-risk actions.
+4. `TaskDecompositionEngine` builds subtasks.
+5. `TaskGraphEngine` stores graph and dependency metadata.
+6. `SchedulingKernel` calls adaptive scheduler + backpressure controller.
+7. `LoadManager` selects worker targets.
+8. `ExecutorAgent` performs tasks via `ToolRegistry` + `SandboxRunner`.
+9. `VerifierAgent` validates outputs.
+10. `AutonomyEngine` writes `TaskCheckpointStore` updates and publishes events.
+11. `SupervisorAgent` aggregates child outcomes and escalates as needed.
+12. `Guardrails` enforces budget and safety limits before finalization.
+13. `TelemetryService` + `AnomalyDetector` + `Alerts` provide production visibility.
+
+---
+
+## 5) Production Readiness Guarantees
+
+### Distributed Workers
+
+- Worker load tracking and placement through `LoadManager`.
+- Event-driven execution via `EventBus` and mailbox-based command routing.
+
+### Durable Task Graphs
+
+- Graph states are checkpointed in `TaskCheckpointStore`.
+- Recovery can replay checkpoints to reconstruct execution state.
+
+### Hierarchical Supervision
+
+- Planner -> Executor -> Verifier -> Supervisor chain supports layered control.
+- Supervisor escalates high-severity policy/runtime failures.
+
+### Adaptive Scheduling
+
+- Priority ranking by `AdaptiveScheduler`.
+- Throughput throttling by `QueueBackpressureController`.
+
+### Human-in-the-Loop Governance
+
+- Risky actions are paused pending explicit approval.
+- Auditability preserved via approval request records + telemetry events.
+
+### Guardrails and Cost Controls
+
+- Hard and per-request budget caps enforced by `Guardrails`.
+- Alerting and anomaly detection for cost spikes and error bursts.
+
+---
+
+## 6) Suggested Deployment Topology
+
+- **Orchestrator Service**: control-plane APIs, policy checks, scheduling, supervision.
+- **Worker Pool**: scalable executor/verifier workers.
+- **State Store**: task graph + checkpoint persistence.
+- **Event Backbone**: pub/sub broker for events and async notifications.
+- **Monitoring Stack**: telemetry ingestion, anomaly detection, alert routing.
+
+This topology enables horizontal scale while preserving governance, reliability, and recoverability.
