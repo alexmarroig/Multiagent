@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from monitoring.anomaly_detector import RollingAnomalyDetector
 from monitoring.structured_logging import log_event
 
 
@@ -27,6 +28,9 @@ class AlertManager:
         repeated_worker_crashes: int = 3,
         llm_budget_limit: float = 100.0,
         webhook_url: str | None = None,
+        anomaly_window_size: int = 30,
+        anomaly_min_samples: int = 6,
+        anomaly_z_score_threshold: float = 2.5,
     ) -> None:
         self.failure_threshold = max(1, failure_threshold)
         self.unusual_cost_factor = max(1.0, unusual_cost_factor)
@@ -39,6 +43,11 @@ class AlertManager:
         self._recent_results: list[dict[str, Any]] = []
         self._worker_crash_counts: dict[str, int] = {}
         self._logger = logging.getLogger(__name__)
+        self._anomaly_detector = RollingAnomalyDetector(
+            window_size=anomaly_window_size,
+            min_samples=anomaly_min_samples,
+            z_score_threshold=anomaly_z_score_threshold,
+        )
 
     def _emit(self, category: str, message: str, payload: dict[str, Any]) -> Alert:
         alert = Alert(category=category, message=message, payload=payload)
@@ -101,6 +110,7 @@ class AlertManager:
         error_rate: float,
         worker_id: str | None = None,
         worker_crashed: bool = False,
+        task_latency: float = 0.0,
         llm_cost: float = 0.0,
     ) -> list[Alert]:
         emitted: list[Alert] = []
@@ -132,6 +142,28 @@ class AlertManager:
                         {"worker_id": worker_id, "crashes": self._worker_crash_counts[worker_id]},
                     )
                 )
+
+
+        anomalies = self._anomaly_detector.detect_runtime_anomalies(
+            error_rate=error_rate,
+            queue_depth=queue_depth,
+            task_latency=task_latency,
+            worker_crashed=worker_crashed,
+        )
+        for anomaly in anomalies:
+            emitted.append(
+                self._emit(
+                    f"{anomaly.metric}_anomaly",
+                    f"Anomalous runtime behavior detected for {anomaly.metric}.",
+                    {
+                        "metric": anomaly.metric,
+                        "value": round(anomaly.value, 6),
+                        "baseline_mean": round(anomaly.baseline_mean, 6),
+                        "baseline_stddev": round(anomaly.baseline_stddev, 6),
+                        "z_score": round(anomaly.z_score, 6),
+                    },
+                )
+            )
 
         if llm_cost > self.llm_budget_limit:
             emitted.append(

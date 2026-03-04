@@ -1,126 +1,178 @@
-"""Human governance approval queue with reviewer assignment and audit trail."""
-
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from threading import Lock
+from threading import Condition, RLock
 from typing import Any, Literal
 
-Decision = Literal["approved", "rejected"]
+DecisionType = Literal["approved", "rejected"]
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass(slots=True)
 class AuditEntry:
-    token: str
+    timestamp: str
     action: str
     actor: str
-    timestamp: str
-    metadata: dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
-class ApprovalItem:
+class ApprovalRequest:
     token: str
     reason: str
-    status: str = "pending"
     payload: dict[str, Any] = field(default_factory=dict)
-    assigned_reviewer: str | None = None
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    resolved_at: str | None = None
-    decision_comment: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    reviewers: list[str] = field(default_factory=list)
+
+    status: str = "pending"
+    decision: DecisionType | None = None
+    decision_by: str | None = None
+    decision_comment: str = ""
+
+    created_at: str = field(default_factory=_utc_now)
+    resolved_at: str | None = None
+
+    audit_history: list[AuditEntry] = field(default_factory=list)
 
 
 class ApprovalQueue:
-    def __init__(self) -> None:
-        self._items: dict[str, ApprovalItem] = {}
-        self._audit: list[AuditEntry] = []
-        self._lock = Lock()
+    """Thread-safe in-memory queue for human approvals."""
 
-    def request_approval(
+    def __init__(self) -> None:
+        self._lock = RLock()
+        self._condition = Condition(self._lock)
+        self._requests: dict[str, ApprovalRequest] = {}
+
+    def submit(
         self,
         *,
         token: str,
         reason: str,
         payload: dict[str, Any] | None = None,
-        reviewer: str | None = None,
-    ) -> ApprovalItem:
-        with self._lock:
-            item = self._items.get(token)
-            if item is None:
-                item = ApprovalItem(token=token, reason=reason, payload=payload or {}, assigned_reviewer=reviewer)
-                self._items[token] = item
-                self._append_audit(token, "requested", actor="system", metadata={"reason": reason})
-            elif reviewer and item.assigned_reviewer != reviewer:
-                item.assigned_reviewer = reviewer
-                self._append_audit(token, "reviewer_assigned", actor="system", metadata={"reviewer": reviewer})
-            return item
+    ) -> ApprovalRequest:
 
-    def assign_reviewer(self, token: str, reviewer: str, actor: str = "system") -> ApprovalItem:
-        with self._lock:
-            item = self._require_item(token)
-            item.assigned_reviewer = reviewer
-            self._append_audit(token, "reviewer_assigned", actor=actor, metadata={"reviewer": reviewer})
-            return item
+        with self._condition:
+
+            existing = self._requests.get(token)
+            if existing:
+                return existing
+
+            request = ApprovalRequest(
+                token=token,
+                reason=reason,
+                payload=payload or {},
+            )
+
+            request.audit_history.append(
+                AuditEntry(
+                    timestamp=_utc_now(),
+                    action="submitted",
+                    actor="system",
+                    details={"reason": reason},
+                )
+            )
+
+            self._requests[token] = request
+            self._condition.notify_all()
+
+            return request
+
+    def assign_reviewer(
+        self,
+        *,
+        token: str,
+        reviewer: str,
+        assigned_by: str = "system",
+    ) -> ApprovalRequest:
+
+        with self._condition:
+
+            request = self._requests[token]
+
+            if reviewer not in request.reviewers:
+
+                request.reviewers.append(reviewer)
+
+                request.audit_history.append(
+                    AuditEntry(
+                        timestamp=_utc_now(),
+                        action="reviewer_assigned",
+                        actor=assigned_by,
+                        details={"reviewer": reviewer},
+                    )
+                )
+
+                self._condition.notify_all()
+
+            return request
 
     def record_decision(
         self,
         *,
         token: str,
-        decision: Decision,
+        decision: DecisionType,
         reviewer: str,
-        comment: str | None = None,
-    ) -> ApprovalItem:
-        with self._lock:
-            item = self._require_item(token)
-            item.status = decision
-            item.assigned_reviewer = reviewer
-            item.decision_comment = comment
-            item.resolved_at = datetime.now(timezone.utc).isoformat()
-            self._append_audit(
-                token,
-                action="decision_recorded",
-                actor=reviewer,
-                metadata={"decision": decision, "comment": comment or ""},
+        comment: str = "",
+    ) -> ApprovalRequest:
+
+        with self._condition:
+
+            request = self._requests[token]
+
+            request.status = decision
+            request.decision = decision
+            request.decision_by = reviewer
+            request.decision_comment = comment
+            request.resolved_at = _utc_now()
+
+            request.audit_history.append(
+                AuditEntry(
+                    timestamp=request.resolved_at,
+                    action="decision_recorded",
+                    actor=reviewer,
+                    details={
+                        "decision": decision,
+                        "comment": comment,
+                    },
+                )
             )
-            return item
 
-    def get(self, token: str) -> ApprovalItem | None:
+            self._condition.notify_all()
+
+            return request
+
+    def get(self, token: str) -> ApprovalRequest | None:
         with self._lock:
-            return self._items.get(token)
+            return self._requests.get(token)
 
-    def pending(self) -> list[dict[str, Any]]:
+    def pending(self) -> list[ApprovalRequest]:
         with self._lock:
-            return [item.to_dict() for item in self._items.values() if item.status == "pending"]
+            return [r for r in self._requests.values() if r.status == "pending"]
 
-    def audit_history(self, token: str | None = None) -> list[dict[str, Any]]:
-        with self._lock:
-            entries = self._audit if token is None else [entry for entry in self._audit if entry.token == token]
-            return [asdict(entry) for entry in entries]
+    def wait_for_resolution(
+        self,
+        token: str,
+        timeout_seconds: float | None = None,
+    ) -> ApprovalRequest:
 
-    def _require_item(self, token: str) -> ApprovalItem:
-        item = self._items.get(token)
-        if item is None:
-            raise KeyError(f"Unknown approval token: {token}")
-        return item
+        with self._condition:
 
-    def _append_audit(self, token: str, action: str, actor: str, metadata: dict[str, Any] | None = None) -> None:
-        self._audit.append(
-            AuditEntry(
-                token=token,
-                action=action,
-                actor=actor,
-                timestamp=datetime.now(timezone.utc).isoformat(),
-                metadata=metadata or {},
+            request = self._requests[token]
+
+            self._condition.wait_for(
+                lambda: request.status in {"approved", "rejected"},
+                timeout=timeout_seconds,
             )
-        )
+
+            return request
 
 
-_APPROVAL_QUEUE = ApprovalQueue()
+GLOBAL_APPROVAL_QUEUE = ApprovalQueue()
 
 
 def get_approval_queue() -> ApprovalQueue:
-    return _APPROVAL_QUEUE
+    return GLOBAL_APPROVAL_QUEUE
