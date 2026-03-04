@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable
 
-from tools.sandbox_runner import DEFAULT_SANDBOX_RUNNER, SandboxPolicy
+from core.execution_gateway import ExecutionGateway
 
 
 ToolCallable = Callable[..., Any]
@@ -44,16 +44,20 @@ class ToolRegistry:
     def all_tools(self) -> list[ToolSpec]:
         return list(self._tools.values())
 
-    def _sandboxed_handler(self, handler: ToolCallable, tool_name: str) -> ToolCallable:
-        @wraps(handler)
+    def _gateway_handler(self, gateway: ExecutionGateway, spec: ToolSpec) -> ToolCallable:
+        @wraps(spec.handler)
         def _wrapped(*args: Any, **kwargs: Any) -> Any:
-            result = DEFAULT_SANDBOX_RUNNER.run_callable(handler, *args, policy=SandboxPolicy(), **kwargs)
-            if not result.ok:
-                return {"error": f"{tool_name} sandbox error: {result.error}"}
-            return result.output
+            return gateway.execute_tool(
+                tool_name=spec.name,
+                category=spec.category,
+                handler=spec.handler,
+                args=args,
+                kwargs=kwargs,
+            )
 
         return _wrapped
 
-    def attach_to_agent(self, agent: Any, tool_names: list[str]) -> None:
-        bound = {name: self._sandboxed_handler(self.get(name).handler, name) for name in tool_names}
+    def attach_to_agent(self, agent: Any, tool_names: list[str], gateway: ExecutionGateway | None = None) -> None:
+        execution_gateway = gateway or ExecutionGateway()
+        bound = {name: self._gateway_handler(execution_gateway, self.get(name)) for name in tool_names}
         setattr(agent, "tools", bound)

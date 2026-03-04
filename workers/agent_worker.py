@@ -10,6 +10,7 @@ from typing import Any, Protocol
 
 from communication.event_bus import Event, EventBus
 from core.task_queue import DistributedTaskQueue, QueueTask
+from monitoring.tracing import get_tracer
 
 
 class TaskHandler(Protocol):
@@ -64,6 +65,7 @@ class AgentWorker:
         self._running = False
         self._thread: threading.Thread | None = None
         self._last_heartbeat = 0.0
+        self._tracer = get_tracer()
 
     def _emit_heartbeat(self) -> None:
         now = time.time()
@@ -79,26 +81,28 @@ class AgentWorker:
         if task is None:
             return False
 
-        self.event_bus.publish_event(
-            Event(
-                topic="worker.task_started",
-                payload={"worker_id": self.worker_id, "task_id": task.task_id, "task": asdict(task)},
-            )
-        )
-        try:
-            result = self.task_handler.execute(task)
-            self.result_store.save_result(task, result)
-            self.queue.acknowledge_task(task)
-            self.telemetry.processed_tasks += 1
-            self.event_bus.report_completion(task_id=task.task_id, worker_id=self.worker_id, result=result)
-        except Exception as exc:  # noqa: BLE001
-            self.telemetry.failed_tasks += 1
+        with self._tracer.start_span("agent.execution", kind="agent_execution", attributes={"worker_id": self.worker_id, "task_id": task.task_id}):
             self.event_bus.publish_event(
                 Event(
-                    topic="worker.task_failed",
-                    payload={"worker_id": self.worker_id, "task_id": task.task_id, "error": str(exc)},
+                    topic="worker.task_started",
+                    payload={"worker_id": self.worker_id, "task_id": task.task_id, "task": asdict(task)},
                 )
             )
+            try:
+                result = self.task_handler.execute(task)
+                self.result_store.save_result(task, result)
+                self.queue.acknowledge_task(task)
+                self.telemetry.processed_tasks += 1
+                self.event_bus.report_completion(task_id=task.task_id, worker_id=self.worker_id, result=result)
+            except Exception as exc:  # noqa: BLE001
+                self.telemetry.failed_tasks += 1
+                self.queue.fail_task(task, error=str(exc))
+                self.event_bus.publish_event(
+                    Event(
+                        topic="worker.task_failed",
+                        payload={"worker_id": self.worker_id, "task_id": task.task_id, "error": str(exc)},
+                    )
+                )
         return True
 
     def run_forever(self) -> None:

@@ -132,6 +132,8 @@ class DistributedTaskQueue:
         *,
         queue_high_watermark: int = 100,
         queue_low_watermark: int = 40,
+        max_retries: int = 3,
+        visibility_timeout_seconds: int = 30,
     ) -> None:
         if queue_high_watermark <= 0:
             raise ValueError("queue_high_watermark must be positive")
@@ -144,11 +146,18 @@ class DistributedTaskQueue:
         self.queue_high_watermark = queue_high_watermark
         self.queue_low_watermark = queue_low_watermark
         self._scheduling_paused = False
+        self.max_retries = max(1, max_retries)
+        self.visibility_timeout_seconds = max(1, visibility_timeout_seconds)
+        self._inflight: dict[str, tuple[QueueTask, float]] = {}
         self._logger = logging.getLogger(__name__)
 
     @property
     def processing_queue_name(self) -> str:
         return f"{self.queue_name}:processing"
+
+    @property
+    def dead_letter_queue_name(self) -> str:
+        return f"{self.queue_name}:dlq"
 
     def enqueue_task(self, task: QueueTask | dict[str, Any]) -> QueueTask:
         if isinstance(task, dict):
@@ -165,14 +174,32 @@ class DistributedTaskQueue:
         return task
 
     def dequeue_task(self, timeout_seconds: int = 1) -> QueueTask | None:
+        self._requeue_expired_inflight()
         raw = self.backend.pop(self.queue_name, timeout_seconds=timeout_seconds)
         self._refresh_pressure_state()
         if raw is None:
             return None
-        return QueueTask.from_json(raw)
+        task = QueueTask.from_json(raw)
+        self._inflight[task.task_id] = (task, time.time() + self.visibility_timeout_seconds)
+        return task
 
     def acknowledge_task(self, task: QueueTask) -> None:
+        self._inflight.pop(task.task_id, None)
         self.backend.ack(self.processing_queue_name, task.to_json())
+
+    def fail_task(self, task: QueueTask, *, error: str) -> None:
+        self._inflight.pop(task.task_id, None)
+        attempts = int(task.metadata.get("attempts", 0)) + 1
+        task.metadata["attempts"] = attempts
+        task.metadata["last_error"] = error
+        if attempts >= self.max_retries:
+            self.backend.push(self.dead_letter_queue_name, task.to_json())
+            self.backend.ack(self.processing_queue_name, task.to_json())
+            log_event(self._logger, component="queue", event="task_dead_lettered", severity="warning", task_id=task.task_id, attempts=attempts)
+            return
+        self.backend.push(self.queue_name, task.to_json())
+        self.backend.ack(self.processing_queue_name, task.to_json())
+        log_event(self._logger, component="queue", event="task_retried", severity="warning", task_id=task.task_id, attempts=attempts)
 
     def queue_size(self) -> int:
         return self.backend.length(self.queue_name)
@@ -182,6 +209,16 @@ class DistributedTaskQueue:
 
     def can_schedule_new_tasks(self) -> bool:
         return not self._refresh_pressure_state()
+
+    def dead_letter_size(self) -> int:
+        return self.backend.length(self.dead_letter_queue_name)
+
+    def _requeue_expired_inflight(self) -> None:
+        now = time.time()
+        expired = [task_id for task_id, (_, deadline) in self._inflight.items() if deadline <= now]
+        for task_id in expired:
+            task, _ = self._inflight.pop(task_id)
+            self.fail_task(task, error="visibility_timeout")
 
     def _refresh_pressure_state(self) -> bool:
         size = self.queue_size()
