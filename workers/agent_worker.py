@@ -57,6 +57,8 @@ class AgentWorker:
         heartbeat_interval_seconds: float = 1.0,
         retry_engine: RetryEngine | None = None,
         max_batch_size: int = 4,
+        tenant_allowlist: set[str] | None = None,
+        max_consecutive_failures: int = 25,
     ) -> None:
         self.worker_id = worker_id
         self.queue = queue
@@ -72,6 +74,9 @@ class AgentWorker:
         self._tracer = get_tracer()
         self.retry_engine = retry_engine or get_default_retry_engine()
         self.max_batch_size = max(1, max_batch_size)
+        self.tenant_allowlist = tenant_allowlist
+        self.max_consecutive_failures = max(1, max_consecutive_failures)
+        self._consecutive_failures = 0
 
     def _emit_heartbeat(self) -> None:
         now = time.time()
@@ -86,6 +91,12 @@ class AgentWorker:
         task = self.queue.dequeue_task(timeout_seconds=1)
         if task is None:
             return False
+
+        tenant_id = str(task.metadata.get("tenant_id", "default"))
+        if self.tenant_allowlist is not None and tenant_id not in self.tenant_allowlist:
+            self.queue.fail_task(task, error=f"tenant_not_allowed:{tenant_id}")
+            runtime_metrics.inc("worker.tasks_rejected")
+            return True
 
         with self._tracer.start_span("agent.execution", kind="agent_execution", attributes={"worker_id": self.worker_id, "task_id": task.task_id}):
             self.event_bus.publish_event(
@@ -102,12 +113,14 @@ class AgentWorker:
                     context={"worker_id": self.worker_id, "task_id": task.task_id, "task_name": task.name},
                 )
                 self.result_store.save_result(task, result)
+                self._consecutive_failures = 0
                 self.queue.acknowledge_task(task)
                 self.telemetry.processed_tasks += 1
                 self.event_bus.report_completion(task_id=task.task_id, worker_id=self.worker_id, result=result)
                 runtime_metrics.inc("worker.tasks_processed")
             except Exception as exc:  # noqa: BLE001
                 self.telemetry.failed_tasks += 1
+                self._consecutive_failures += 1
                 self.queue.fail_task(task, error=str(exc), exc=exc)
                 runtime_metrics.inc("worker.tasks_failed")
                 self.event_bus.publish_event(
@@ -131,6 +144,10 @@ class AgentWorker:
     def run_forever(self) -> None:
         self._running = True
         while self._running:
+            if self._consecutive_failures >= self.max_consecutive_failures:
+                runtime_metrics.inc("worker.circuit_breaker_tripped")
+                self._running = False
+                break
             self._emit_heartbeat()
             processed = self.process_batch()
             if self.queue.is_under_pressure():
