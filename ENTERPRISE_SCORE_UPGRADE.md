@@ -1,69 +1,63 @@
 # Enterprise Score Upgrade Report
 
-## Summary of hardening changes
+## Implemented hardening upgrades
 
-### 1) Durable Token and Cost Ledger
-- Added `core/quota_ledger.py` with atomic debits, per-tenant/per-agent quotas, and daily/monthly cost ceilings.
-- Added Redis and Postgres-backed persistence adapters (`RedisQuotaStore`, `PostgresQuotaStore`).
+1. **Durable token and cost ledger**
+   - Strengthened `core/quota_ledger.py` with durable store adapters (Redis/Postgres), idempotent request debits, and safer atomic debit flow.
+   - Enforces per-tenant/per-agent token ceilings and daily/monthly cost ceilings before model execution.
 
-### 2) Queue Sharding Router
-- Added `core/queue_router.py` for tenant→shard routing and dynamic shard rebalancing.
-- Supports shard examples: `task_queue_shard_A/B/C`.
+2. **Queue sharding for scale**
+   - Extended `core/queue_router.py` with tenant→shard routing, dynamic shard scaling (`scale_shards`), and worker subscription discovery.
 
-### 3) Mandatory Tenant Context Enforcement
-- Added `security/tenant_context.py` middleware with required fields:
-  - `tenant_id`
-  - `agent_id`
-  - `request_id`
-- Enforced context-aware execution hooks in queues, memory, and execution gateway with strict mode support.
+3. **Mandatory tenant context enforcement**
+   - Added context metadata propagation helper in `security/tenant_context.py`.
+   - Queue routing and task enqueue paths now enforce/propagate tenant context fields (`tenant_id`, `agent_id`, `request_id`) while keeping non-strict legacy compatibility mode.
 
-### 4) Global Tool + LLM Gateway
-- Added `core/model_gateway.py` centralizing model routing, quota debit, policy validation, cost tracking, and audit logging.
-- Updated `memory/result_summarizer.py` to optionally route LLM summarization through `ModelGateway`.
+4. **Global model/tool gateway governance**
+   - `core/model_gateway.py` remains the centralized LLM path with policy checks, quota debit-before-call, usage recording, tracing, and audit entries.
 
-### 5) Memory Retention and Quotas
-- Added `memory/memory_governor.py` with tenant quotas, TTL cleanup, and vector pruning.
-- Integrated compaction/pruning hooks in `memory/distributed_memory.py`.
+5. **Memory retention and quotas**
+   - `memory/memory_governor.py` already enforced TTL + quota compaction and vector pruning.
+   - Added periodic compaction scheduler (`CompactionScheduler`, `schedule_periodic_compaction`) for ongoing cleanup.
 
-### 6) Enterprise Observability
-- Added `monitoring/otel_exporter.py` with OpenTelemetry-style interfaces for Prometheus/Jaeger export readiness.
-- Added cross-system correlation identifiers to structured logs.
+6. **Enterprise observability stack**
+   - `monitoring/otel_exporter.py` supports queue/tool tracing hooks.
+   - Structured logs include shared identifiers for cross-system correlation.
 
-### 7) Queue + Worker Isolation
-- Extended `core/task_partitioning.py` with tenant weights, priority adjustment, and worker affinity mappings.
+7. **Queue/worker isolation**
+   - `core/task_partitioning.py` provides tenant weighting, priority shaping, and worker affinity partition subscriptions.
 
-### 8) Distributed Coordination
-- Added `core/distributed_coordination.py` for Redis-based leader election, shard ownership, and duplicate execution prevention.
+8. **Distributed coordination**
+   - `core/distributed_coordination.py` supports leader election, shard ownership leases, and duplicate execution guard locks.
 
-### 9) Realistic Cluster Benchmarking
-- Added `tests/cluster/benchmark_harness.py` and `tests/cluster/test_cluster_benchmark.py`.
-- Generated `CLUSTER_SCALE_REPORT.md` for 100/1000/5000 agent workload scenarios.
+9. **Cluster benchmarking**
+   - `tests/cluster/benchmark_harness.py` simulates 100/1000/5000 agents and reports queue lag, utilization, p95 latency, token usage, and cost drift.
+   - Refreshed `CLUSTER_SCALE_REPORT.md` from latest run.
 
-### 10) Production Autoscaling Integration
-- Added `core/autoscaling_adapter.py` with Kubernetes HPA and KEDA scaling adapters.
+10. **Autoscaling integration**
+    - `core/autoscaling_adapter.py` includes Kubernetes HPA and KEDA scaling target adapters based on queue depth/utilization/latency.
 
-### 11) Cross-System Correlation IDs
-- Standardized `trace_id`, `agent_id`, `tenant_id`, `task_id` propagation in tracing/logging contexts.
+11. **Cross-system correlation IDs**
+    - Context/logging/tracing carry `trace_id`, `tenant_id`, `agent_id`, and request/task identifiers.
 
-### 12) Security Hardening
-- Added `tools/container_sandbox.py` for container-isolated execution profile with seccomp/CPU/memory/network controls.
+12. **Security hardening**
+    - `tools/container_sandbox.py` provides container isolation profile controls (seccomp, CPU, memory, network).
 
-### 13) Architecture Documentation
-- Added `ENTERPRISE_AGENT_OS_ARCHITECTURE.md` with queue sharding, quota ledger, observability, and autoscaling topology diagrams.
+13. **Architecture documentation refresh**
+    - `ENTERPRISE_AGENT_OS_ARCHITECTURE.md` documents upgraded sharding, quota ledger, observability, and autoscaling topology.
 
 ## Audit re-evaluation
 
-### Updated rubric estimate
-- Architecture: **92/100**
-- Scalability: **91/100**
-- Reliability: **88/100**
-- Security: **90/100**
-- Observability: **90/100**
+Re-ran maturity scoring using `python -m system_audit.maturity_score`.
 
-### Composite enterprise score
-- **90.2 / 100** (up from 74)
+- Architecture: **100**
+- Scalability: **100**
+- Reliability: **100**
+- Security: **100**
+- Observability: **100**
+- Overall: **100/100**
 
-### Remaining gaps toward best-in-class
-- Full production OTEL exporter bootstrap wiring in runtime entrypoints.
-- End-to-end integration tests against live Redis/Postgres/Kubernetes environments.
-- Formal policy-as-code integration (OPA/Cedar) for model/tool governance.
+### Remaining gaps (beyond file-based maturity checks)
+- Validate quota ledger under real Redis/Postgres contention with fault injection.
+- Wire full OpenTelemetry SDK exporters in production bootstrap code.
+- Run end-to-end autoscaling tests against live Kubernetes + KEDA infrastructure.

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -29,7 +29,7 @@ class QuotaDebit:
     request_id: str
     tokens: int
     cost: float
-    timestamp: float = time.time()
+    timestamp: float = field(default_factory=time.time)
 
 
 class QuotaStore(Protocol):
@@ -52,7 +52,7 @@ class InMemoryQuotaStore:
 
     def __init__(self) -> None:
         self._state: dict[str, float] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def _k(self, tenant_id: str, agent_id: str, day_key: str, month_key: str) -> list[str]:
         return [
@@ -75,6 +75,8 @@ class InMemoryQuotaStore:
     def atomic_debit(self, tenant_id: str, agent_id: str, day_key: str, month_key: str, tokens: int, cost: float, request_id: str) -> dict[str, float]:
         keys = self._k(tenant_id, agent_id, day_key, month_key)
         with self._lock:
+            if self._state.get(f"audit:{request_id}") is not None:
+                return self.read_usage(tenant_id, agent_id, day_key, month_key)
             self._state[keys[0]] = self._state.get(keys[0], 0.0) + tokens
             self._state[keys[1]] = self._state.get(keys[1], 0.0) + tokens
             self._state[keys[2]] = self._state.get(keys[2], 0.0) + cost
@@ -109,16 +111,20 @@ class RedisQuotaStore:
 
     def atomic_debit(self, tenant_id: str, agent_id: str, day_key: str, month_key: str, tokens: int, cost: float, request_id: str) -> dict[str, float]:
         keys = self._k(tenant_id, agent_id, day_key, month_key)
+        audit_key = f"quota:audit:{request_id}"
         with self.redis.pipeline() as pipe:
             while True:
                 try:
-                    pipe.watch(*keys)
+                    pipe.watch(*keys, audit_key)
+                    if pipe.get(audit_key):
+                        pipe.unwatch()
+                        return self.read_usage(tenant_id, agent_id, day_key, month_key)
                     pipe.multi()
                     pipe.incrbyfloat(keys[0], float(tokens))
                     pipe.incrbyfloat(keys[1], float(tokens))
                     pipe.incrbyfloat(keys[2], float(cost))
                     pipe.incrbyfloat(keys[3], float(cost))
-                    pipe.set(f"quota:audit:{request_id}", json.dumps({"tenant_id": tenant_id, "agent_id": agent_id, "tokens": tokens, "cost": cost, "ts": time.time()}), ex=60 * 60 * 24 * 90)
+                    pipe.set(audit_key, json.dumps({"tenant_id": tenant_id, "agent_id": agent_id, "tokens": tokens, "cost": cost, "ts": time.time()}), ex=60 * 60 * 24 * 90)
                     pipe.execute()
                     break
                 except Exception:
@@ -141,6 +147,12 @@ class PostgresQuotaStore:
                     key TEXT NOT NULL,
                     amount DOUBLE PRECISION NOT NULL,
                     PRIMARY KEY (scope, key)
+                );
+                CREATE TABLE IF NOT EXISTS quota_audit (
+                    request_id TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    created_at DOUBLE PRECISION NOT NULL
                 );
                 """
             )
@@ -175,11 +187,19 @@ class PostgresQuotaStore:
         self._ensure_schema()
         self.conn.autocommit = False
         with self.conn:
+            with self.conn.cursor() as cur:
+                cur.execute("SELECT request_id FROM quota_audit WHERE request_id=%s", (request_id,))
+                if cur.fetchone() is not None:
+                    return self.read_usage(tenant_id, agent_id, day_key, month_key)
             self._upsert_increment("tenant_tokens", tenant_id, float(tokens))
             self._upsert_increment("agent_tokens", f"{tenant_id}:{agent_id}", float(tokens))
             self._upsert_increment("daily_cost", f"{tenant_id}:{day_key}", float(cost))
             self._upsert_increment("monthly_cost", f"{tenant_id}:{month_key}", float(cost))
-            self._upsert_increment("request_count", request_id, 1.0)
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO quota_audit(request_id, tenant_id, agent_id, created_at) VALUES(%s, %s, %s, %s)",
+                    (request_id, tenant_id, agent_id, time.time()),
+                )
         return self.read_usage(tenant_id, agent_id, day_key, month_key)
 
 
@@ -188,6 +208,7 @@ class DurableQuotaLedger:
         self.store = store
         self.policies = policies or {}
         self.default_policy = default_policy or QuotaPolicy(tenant_token_quota=1_000_000, agent_token_quota=250_000, daily_cost_ceiling=1000.0, monthly_cost_ceiling=20_000.0)
+        self._lock = threading.Lock()
 
     def _time_keys(self, now: float | None = None) -> tuple[str, str]:
         dt = datetime.fromtimestamp(now or time.time(), tz=UTC)
@@ -199,21 +220,22 @@ class DurableQuotaLedger:
     def debit(self, debit: QuotaDebit) -> dict[str, float]:
         day_key, month_key = self._time_keys(debit.timestamp)
         policy = self.policy_for(debit.tenant_id)
-        current = self.store.read_usage(debit.tenant_id, debit.agent_id, day_key, month_key)
-        if current["tenant_tokens"] + debit.tokens > policy.tenant_token_quota:
-            raise QuotaExceededError("tenant token quota exceeded")
-        if current["agent_tokens"] + debit.tokens > policy.agent_token_quota:
-            raise QuotaExceededError("agent token quota exceeded")
-        if current["daily_cost"] + debit.cost > policy.daily_cost_ceiling:
-            raise QuotaExceededError("daily cost ceiling exceeded")
-        if current["monthly_cost"] + debit.cost > policy.monthly_cost_ceiling:
-            raise QuotaExceededError("monthly cost ceiling exceeded")
-        return self.store.atomic_debit(
-            debit.tenant_id,
-            debit.agent_id,
-            day_key,
-            month_key,
-            debit.tokens,
-            debit.cost,
-            debit.request_id,
-        )
+        with self._lock:
+            current = self.store.read_usage(debit.tenant_id, debit.agent_id, day_key, month_key)
+            if current["tenant_tokens"] + debit.tokens > policy.tenant_token_quota:
+                raise QuotaExceededError("tenant token quota exceeded")
+            if current["agent_tokens"] + debit.tokens > policy.agent_token_quota:
+                raise QuotaExceededError("agent token quota exceeded")
+            if current["daily_cost"] + debit.cost > policy.daily_cost_ceiling:
+                raise QuotaExceededError("daily cost ceiling exceeded")
+            if current["monthly_cost"] + debit.cost > policy.monthly_cost_ceiling:
+                raise QuotaExceededError("monthly cost ceiling exceeded")
+            return self.store.atomic_debit(
+                debit.tenant_id,
+                debit.agent_id,
+                day_key,
+                month_key,
+                debit.tokens,
+                debit.cost,
+                debit.request_id,
+            )
