@@ -59,6 +59,7 @@ class AgentWorker:
         max_batch_size: int = 4,
         tenant_allowlist: set[str] | None = None,
         max_consecutive_failures: int = 25,
+        max_tenant_failures_before_quarantine: int = 5,
     ) -> None:
         self.worker_id = worker_id
         self.queue = queue
@@ -76,7 +77,10 @@ class AgentWorker:
         self.max_batch_size = max(1, max_batch_size)
         self.tenant_allowlist = tenant_allowlist
         self.max_consecutive_failures = max(1, max_consecutive_failures)
+        self.max_tenant_failures_before_quarantine = max(1, max_tenant_failures_before_quarantine)
         self._consecutive_failures = 0
+        self._tenant_failures: dict[str, int] = {}
+        self._tenant_quarantine: set[str] = set()
 
     def _emit_heartbeat(self) -> None:
         now = time.time()
@@ -98,6 +102,11 @@ class AgentWorker:
             runtime_metrics.inc("worker.tasks_rejected")
             return True
 
+        if tenant_id in self._tenant_quarantine:
+            self.queue.fail_task(task, error=f"tenant_quarantined:{tenant_id}")
+            runtime_metrics.inc("worker.tasks_rejected")
+            return True
+
         with self._tracer.start_span("agent.execution", kind="agent_execution", attributes={"worker_id": self.worker_id, "task_id": task.task_id}):
             self.event_bus.publish_event(
                 Event(
@@ -114,6 +123,7 @@ class AgentWorker:
                 )
                 self.result_store.save_result(task, result)
                 self._consecutive_failures = 0
+                self._tenant_failures[tenant_id] = 0
                 self.queue.acknowledge_task(task)
                 self.telemetry.processed_tasks += 1
                 self.event_bus.report_completion(task_id=task.task_id, worker_id=self.worker_id, result=result)
@@ -121,6 +131,11 @@ class AgentWorker:
             except Exception as exc:  # noqa: BLE001
                 self.telemetry.failed_tasks += 1
                 self._consecutive_failures += 1
+                tenant_failures = self._tenant_failures.get(tenant_id, 0) + 1
+                self._tenant_failures[tenant_id] = tenant_failures
+                if tenant_failures >= self.max_tenant_failures_before_quarantine:
+                    self._tenant_quarantine.add(tenant_id)
+                    runtime_metrics.inc("worker.tenant_quarantined")
                 self.queue.fail_task(task, error=str(exc), exc=exc)
                 runtime_metrics.inc("worker.tasks_failed")
                 self.event_bus.publish_event(

@@ -73,3 +73,31 @@ def test_model_gateway_enforces_allowlist_and_uses_semantic_cache() -> None:
             ModelRequest(prompt="blocked", model="reasoning", max_tokens=100, estimated_tokens=10, estimated_cost=0.1, metadata={}),
             context=ctx,
         )
+
+
+def test_queue_fairness_defers_same_tenant_streak() -> None:
+    queue = DistributedTaskQueue(
+        InMemoryQueueBackend(),
+        max_tasks_per_dequeue_cycle=1,
+    )
+    queue.enqueue_task({"task_id": "t1", "name": "a", "metadata": {"tenant_id": "tenant-a"}})
+    queue.enqueue_task({"task_id": "t2", "name": "a", "metadata": {"tenant_id": "tenant-a"}})
+
+    first = queue.dequeue_task()
+    assert first is not None
+    second = queue.dequeue_task()
+    assert second is None
+
+
+def test_queue_applies_tenant_priority_boost() -> None:
+    queue = DistributedTaskQueue(
+        InMemoryQueueBackend(),
+        tenant_priority_boost={"tenant-vip": 20},
+    )
+    task = queue.enqueue_task({
+        "task_id": "vip-1",
+        "name": "task",
+        "priority": 50,
+        "metadata": {"tenant_id": "tenant-vip"},
+    })
+    assert task.priority == 30

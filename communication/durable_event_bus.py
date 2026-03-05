@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -32,12 +33,16 @@ class DurableEventBus:
         stream_name: str = "agentos:events",
         dead_letter_stream: str = "agentos:events:dlq",
         max_consumer_failures: int = 3,
+        max_payload_bytes: int = 131072,
+        dedupe_window_size: int = 2048,
     ) -> None:
         self.redis = redis_client
         self.stream_name = stream_name
         self.dead_letter_stream = dead_letter_stream
         self.max_consumer_failures = max(1, max_consumer_failures)
+        self.max_payload_bytes = max(1024, max_payload_bytes)
         self._local_subscribers: dict[str, list[Subscriber]] = {}
+        self._recent_event_ids: deque[str] = deque(maxlen=max(1, dedupe_window_size))
 
     @classmethod
     def from_url(cls, redis_url: str, *, stream_name: str = "agentos:events") -> "DurableEventBus":
@@ -58,7 +63,15 @@ class DurableEventBus:
         return self.publish_event(event)
 
     def publish_event(self, event: Event) -> str:
-        message = {"topic": event.topic, "payload": json.dumps(event.payload), "timestamp": str(event.timestamp)}
+        payload_json = json.dumps(event.payload)
+        if len(payload_json.encode("utf-8")) > self.max_payload_bytes:
+            runtime_metrics.inc("event_bus.payload_rejected")
+            raise ValueError(f"event payload too large for topic={event.topic}")
+        event_id = event.event_id or f"evt-{uuid.uuid4().hex}"
+        if event_id in self._recent_event_ids:
+            runtime_metrics.inc("event_bus.duplicates_dropped")
+            return event_id
+        message = {"topic": event.topic, "payload": payload_json, "timestamp": str(event.timestamp), "event_id": event_id}
         if self.redis is not None:
             try:
                 message_id = str(self.redis.xadd(self.stream_name, message))
@@ -66,8 +79,8 @@ class DurableEventBus:
                 runtime_metrics.inc("event_bus.publish_failures")
                 raise
         else:
-            event.event_id = event.event_id or f"local-{uuid.uuid4().hex}"
-            message_id = event.event_id
+            message_id = event_id
+        self._recent_event_ids.append(event_id)
         self._dispatch_local(Event(topic=event.topic, payload=event.payload, event_id=message_id, timestamp=event.timestamp))
         runtime_metrics.inc("event_bus.published")
         return message_id
@@ -77,7 +90,7 @@ class DurableEventBus:
         if self.redis is None:
             return events
         for message_id, data in self.redis.xrange(self.stream_name, min=from_id, count=count):
-            event = Event(topic=data["topic"], payload=json.loads(data["payload"]), event_id=message_id, timestamp=float(data.get("timestamp", time.time())))
+            event = Event(topic=data["topic"], payload=json.loads(data["payload"]), event_id=data.get("event_id", message_id), timestamp=float(data.get("timestamp", time.time())))
             if topic and event.topic != topic:
                 continue
             callback(event)
@@ -101,7 +114,7 @@ class DurableEventBus:
         processed = 0
         for _, messages in rows:
             for message_id, data in messages:
-                event = Event(topic=data["topic"], payload=json.loads(data["payload"]), event_id=message_id, timestamp=float(data.get("timestamp", time.time())))
+                event = Event(topic=data["topic"], payload=json.loads(data["payload"]), event_id=data.get("event_id", message_id), timestamp=float(data.get("timestamp", time.time())))
                 try:
                     callback(event)
                 except Exception as exc:  # noqa: BLE001

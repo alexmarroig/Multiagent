@@ -139,6 +139,8 @@ class DistributedTaskQueue:
         visibility_timeout_seconds: int = 30,
         max_inflight_tasks: int = 1000,
         tenant_queue_limits: dict[str, int] | None = None,
+        tenant_priority_boost: dict[str, int] | None = None,
+        max_tasks_per_dequeue_cycle: int = 1000,
         retry_engine: RetryEngine | None = None,
         enforce_tenant_context: bool = False,
     ) -> None:
@@ -157,8 +159,12 @@ class DistributedTaskQueue:
         self.visibility_timeout_seconds = max(1, visibility_timeout_seconds)
         self.max_inflight_tasks = max(1, max_inflight_tasks)
         self.tenant_queue_limits = tenant_queue_limits or {}
+        self.tenant_priority_boost = tenant_priority_boost or {}
+        self.max_tasks_per_dequeue_cycle = max(1, max_tasks_per_dequeue_cycle)
         self._inflight: dict[str, tuple[QueueTask, float]] = {}
         self._tenant_queued_counts: dict[str, int] = {}
+        self._tenant_dequeue_streak: dict[str, int] = {}
+        self._last_dequeued_tenant: str | None = None
         self._logger = logging.getLogger(__name__)
         self.retry_engine = retry_engine or get_default_retry_engine()
         self.enforce_tenant_context = enforce_tenant_context
@@ -184,6 +190,9 @@ class DistributedTaskQueue:
             )
 
         tenant_id = str(task.metadata.get("tenant_id", "default"))
+        priority_boost = self.tenant_priority_boost.get(tenant_id, 0)
+        if priority_boost:
+            task.priority = max(1, task.priority - priority_boost)
         tenant_limit = self.tenant_queue_limits.get(tenant_id)
         if tenant_limit is not None and self.tenant_depth(tenant_id) >= tenant_limit:
             runtime_metrics.inc("queue.tenant_backpressure_rejections")
@@ -207,6 +216,11 @@ class DistributedTaskQueue:
             runtime_metrics.set_gauge(f"queue.depth.{self.queue_name}", float(self.queue_size()))
             return None
         task = QueueTask.from_json(raw)
+        if not self._is_tenant_eligible(task):
+            self.backend.push(self.queue_name, task.to_json())
+            self.backend.ack(self.processing_queue_name, raw)
+            runtime_metrics.inc("queue.tenant_fairness_deferred")
+            return None
         next_attempt_at = float(task.metadata.get("next_attempt_at", 0.0) or 0.0)
         if next_attempt_at > time.time():
             self.backend.push(self.queue_name, task.to_json())
@@ -216,6 +230,7 @@ class DistributedTaskQueue:
         tenant_id = str(task.metadata.get("tenant_id", "default"))
         current = self._tenant_queued_counts.get(tenant_id, 0)
         self._tenant_queued_counts[tenant_id] = max(0, current - 1)
+        self._record_tenant_dequeue(tenant_id)
         runtime_metrics.inc("queue.dequeued")
         runtime_metrics.set_gauge(f"queue.depth.{self.queue_name}", float(self.queue_size()))
         return task
@@ -290,6 +305,20 @@ class DistributedTaskQueue:
         for task_id in expired:
             task, _ = self._inflight.pop(task_id)
             self.fail_task(task, error="visibility_timeout")
+
+    def _is_tenant_eligible(self, task: QueueTask) -> bool:
+        tenant_id = str(task.metadata.get("tenant_id", "default"))
+        if self._last_dequeued_tenant != tenant_id:
+            return True
+        streak = self._tenant_dequeue_streak.get(tenant_id, 0)
+        return streak < self.max_tasks_per_dequeue_cycle
+
+    def _record_tenant_dequeue(self, tenant_id: str) -> None:
+        if self._last_dequeued_tenant != tenant_id:
+            self._last_dequeued_tenant = tenant_id
+            self._tenant_dequeue_streak[tenant_id] = 1
+            return
+        self._tenant_dequeue_streak[tenant_id] = self._tenant_dequeue_streak.get(tenant_id, 0) + 1
 
     def _refresh_pressure_state(self) -> bool:
         size = self.queue_size()
