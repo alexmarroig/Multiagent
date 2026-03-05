@@ -5,7 +5,7 @@ import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from backend.api.routes_governance import router as governance_router
+from api.routes_governance import router as governance_router
 from governance.approval_queue import ApprovalQueue
 from governance.human_validation import HumanValidationController, HumanValidationError, ValidationGates
 
@@ -45,7 +45,7 @@ def test_governance_routes_pending_and_decisions() -> None:
     queue.request_approval(token="task:demo:execute", reason="pre_execution", payload={"task": "demo"})
 
     # Patch singleton through module attribute for deterministic test isolation.
-    import backend.api.routes_governance as routes
+    import api.routes_governance as routes
 
     routes.get_approval_queue = lambda: queue  # type: ignore[assignment]
 
