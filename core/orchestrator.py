@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from core.task_queue import DistributedTaskQueue
+
 from communication.agent_mailbox import AgentMailbox
 from communication.event_bus import EventBus
 from core.autonomy_engine import AutonomyEngine
@@ -42,6 +44,8 @@ class Orchestrator:
         telemetry: TelemetryService,
         event_bus: EventBus,
         mailbox: AgentMailbox,
+        task_queue: DistributedTaskQueue | None = None,
+        max_schedule_tasks: int = 500,
     ) -> None:
         self.task_graph = task_graph
         self.autonomy_engine = autonomy_engine
@@ -53,6 +57,8 @@ class Orchestrator:
         self.telemetry = telemetry
         self.event_bus = event_bus
         self.mailbox = mailbox
+        self.task_queue = task_queue
+        self.max_schedule_tasks = max(1, max_schedule_tasks)
 
     def run(self, context: OrchestrationContext, objective: dict[str, Any]) -> dict[str, Any]:
         self.telemetry.record("orchestration.started", {"request_id": context.request_id, "objective": objective})
@@ -70,8 +76,19 @@ class Orchestrator:
             graph_id = self.task_graph.create_graph(context.request_id, objective)
         elif hasattr(self.task_graph, "ingest_plan"):
             self.task_graph.ingest_plan(objective.get("tasks", []))
+        if self.task_queue is not None and not self.task_queue.can_schedule_new_tasks():
+            self.telemetry.record("orchestration.backpressure_rejected", {"request_id": context.request_id})
+            return {"status": "deferred", "reason": "queue_backpressure"}
+
         schedule = self.scheduler.generate_plan(graph_id, objective)
-        run_report = self.autonomy_engine.execute(graph_id=graph_id, schedule=schedule)
+        if isinstance(schedule, list) and len(schedule) > self.max_schedule_tasks:
+            schedule = schedule[: self.max_schedule_tasks]
+            self.telemetry.record("orchestration.schedule_truncated", {"request_id": context.request_id, "max_schedule_tasks": self.max_schedule_tasks})
+        try:
+            run_report = self.autonomy_engine.execute(graph_id=graph_id, schedule=schedule)
+        except Exception as exc:  # noqa: BLE001
+            self.telemetry.record("orchestration.failed", {"request_id": context.request_id, "error": str(exc)})
+            return {"status": "failed", "graph_id": graph_id, "reason": str(exc)}
         guarded_report = self.guardrails.enforce(run_report, budget_limit_usd=context.budget_limit_usd)
         placement = self.load_manager.snapshot()
 

@@ -156,20 +156,26 @@ class ExecutionGateway:
             },
         ):
 
-            result = self._pipeline.execute(
-                AgentAction(
-                    tool_name=tool_name,
-                    category=category,
-                    handler=handler,
-                    args=args,
-                    kwargs=kwargs,
-                    estimated_cost=estimated_cost,
-                    risk_level=risk_level,
-                    require_approval=(
-                        category in self.policy.require_approval_categories
-                    ),
-                    sandbox_policy=sandbox_policy or SandboxPolicy(),
-                )
+            action = AgentAction(
+                tool_name=tool_name,
+                category=category,
+                handler=handler,
+                args=args,
+                kwargs=kwargs,
+                estimated_cost=estimated_cost,
+                risk_level=risk_level,
+                require_approval=(
+                    category in self.policy.require_approval_categories
+                ),
+                sandbox_policy=sandbox_policy or SandboxPolicy(),
+            )
+
+            strategy = "external_api" if category in {"integration", "external_api"} else "task_execution"
+            result = self.retry_engine.execute(
+                strategy,
+                self._pipeline.execute,
+                action,
+                context={"tool": tool_name, "category": category, "tenant_id": ctx.tenant_id},
             )
 
             self._spent_cost += max(estimated_cost, 0.0)

@@ -25,9 +25,18 @@ Subscriber = Callable[[Event], None]
 class DurableEventBus:
     """Redis Stream-backed event bus with replay and consumer group support."""
 
-    def __init__(self, redis_client: Any | None = None, *, stream_name: str = "agentos:events") -> None:
+    def __init__(
+        self,
+        redis_client: Any | None = None,
+        *,
+        stream_name: str = "agentos:events",
+        dead_letter_stream: str = "agentos:events:dlq",
+        max_consumer_failures: int = 3,
+    ) -> None:
         self.redis = redis_client
         self.stream_name = stream_name
+        self.dead_letter_stream = dead_letter_stream
+        self.max_consumer_failures = max(1, max_consumer_failures)
         self._local_subscribers: dict[str, list[Subscriber]] = {}
 
     @classmethod
@@ -93,7 +102,31 @@ class DurableEventBus:
         for _, messages in rows:
             for message_id, data in messages:
                 event = Event(topic=data["topic"], payload=json.loads(data["payload"]), event_id=message_id, timestamp=float(data.get("timestamp", time.time())))
-                callback(event)
+                try:
+                    callback(event)
+                except Exception as exc:  # noqa: BLE001
+                    runtime_metrics.inc("event_bus.consumer_failures")
+                    attempts = int(data.get("attempts", 0)) + 1
+                    if attempts >= self.max_consumer_failures:
+                        if self.redis is not None:
+                            self.redis.xadd(self.dead_letter_stream, {
+                                "topic": event.topic,
+                                "payload": json.dumps(event.payload),
+                                "timestamp": str(event.timestamp),
+                                "error": str(exc),
+                            })
+                        self.redis.xack(self.stream_name, group, message_id)
+                        runtime_metrics.inc("event_bus.dead_lettered")
+                    else:
+                        if self.redis is not None:
+                            self.redis.xadd(self.stream_name, {
+                                "topic": event.topic,
+                                "payload": json.dumps(event.payload),
+                                "timestamp": str(event.timestamp),
+                                "attempts": str(attempts),
+                            })
+                        self.redis.xack(self.stream_name, group, message_id)
+                    continue
                 self.redis.xack(self.stream_name, group, message_id)
                 runtime_metrics.inc("event_bus.consumed")
                 self._dispatch_local(event)

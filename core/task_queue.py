@@ -137,6 +137,8 @@ class DistributedTaskQueue:
         queue_low_watermark: int = 40,
         max_retries: int = 3,
         visibility_timeout_seconds: int = 30,
+        max_inflight_tasks: int = 1000,
+        tenant_queue_limits: dict[str, int] | None = None,
         retry_engine: RetryEngine | None = None,
         enforce_tenant_context: bool = False,
     ) -> None:
@@ -153,7 +155,10 @@ class DistributedTaskQueue:
         self._scheduling_paused = False
         self.max_retries = max(1, max_retries)
         self.visibility_timeout_seconds = max(1, visibility_timeout_seconds)
+        self.max_inflight_tasks = max(1, max_inflight_tasks)
+        self.tenant_queue_limits = tenant_queue_limits or {}
         self._inflight: dict[str, tuple[QueueTask, float]] = {}
+        self._tenant_queued_counts: dict[str, int] = {}
         self._logger = logging.getLogger(__name__)
         self.retry_engine = retry_engine or get_default_retry_engine()
         self.enforce_tenant_context = enforce_tenant_context
@@ -177,7 +182,19 @@ class DistributedTaskQueue:
                 dependencies=list(task.get("dependencies", [])),
                 metadata=task.get("metadata", {}),
             )
+
+        tenant_id = str(task.metadata.get("tenant_id", "default"))
+        tenant_limit = self.tenant_queue_limits.get(tenant_id)
+        if tenant_limit is not None and self.tenant_depth(tenant_id) >= tenant_limit:
+            runtime_metrics.inc("queue.tenant_backpressure_rejections")
+            raise OverflowError(f"tenant queue saturation for {tenant_id}")
+
+        if len(self._inflight) >= self.max_inflight_tasks:
+            runtime_metrics.inc("queue.inflight_backpressure_rejections")
+            raise OverflowError("queue inflight saturation")
+
         self.backend.push(self.queue_name, task.to_json())
+        self._tenant_queued_counts[tenant_id] = self._tenant_queued_counts.get(tenant_id, 0) + 1
         runtime_metrics.inc("queue.enqueued")
         self._refresh_pressure_state()
         return task
@@ -196,6 +213,9 @@ class DistributedTaskQueue:
             self.backend.ack(self.processing_queue_name, raw)
             return None
         self._inflight[task.task_id] = (task, time.time() + self.visibility_timeout_seconds)
+        tenant_id = str(task.metadata.get("tenant_id", "default"))
+        current = self._tenant_queued_counts.get(tenant_id, 0)
+        self._tenant_queued_counts[tenant_id] = max(0, current - 1)
         runtime_metrics.inc("queue.dequeued")
         runtime_metrics.set_gauge(f"queue.depth.{self.queue_name}", float(self.queue_size()))
         return task
@@ -257,6 +277,12 @@ class DistributedTaskQueue:
 
     def dead_letter_size(self) -> int:
         return self.backend.length(self.dead_letter_queue_name)
+
+    def tenant_depth(self, tenant_id: str) -> int:
+        tenant = tenant_id.strip() or "default"
+        queued = self._tenant_queued_counts.get(tenant, 0)
+        inflight = sum(1 for task, _ in self._inflight.values() if str(task.metadata.get("tenant_id", "default")) == tenant)
+        return queued + inflight
 
     def _requeue_expired_inflight(self) -> None:
         now = time.time()
