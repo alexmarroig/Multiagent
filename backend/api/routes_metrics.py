@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
+from monitoring.runtime_metrics import runtime_metrics
 from observability.metrics import metrics_store
 
 router = APIRouter(prefix="/api/metrics", tags=["metrics"])
@@ -14,6 +15,13 @@ router = APIRouter(prefix="/api/metrics", tags=["metrics"])
 async def get_metrics() -> dict:
     """Retorna snapshot de métricas de execução, tools e websocket."""
     return metrics_store.snapshot()
+
+
+
+
+@router.get("/prometheus", response_class=PlainTextResponse)
+async def prometheus_metrics() -> str:
+    return runtime_metrics.to_prometheus()
 
 
 @router.get("/dashboard", response_class=HTMLResponse)

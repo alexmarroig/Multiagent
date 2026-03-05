@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from monitoring.runtime_metrics import runtime_metrics
+
 from governance.approval_queue import ApprovalQueue
 from governance.policy_engine import PolicyEngine, PolicyViolationError
 from tools.sandbox_runner import SandboxPolicy, SandboxRunner
@@ -29,24 +31,32 @@ class AgentAction:
     risk_level: str = "low"
     require_approval: bool = False
     sandbox_policy: SandboxPolicy | None = None
+    tenant_id: str = "default"
 
 
 class BudgetManager:
     """Tracks cumulative execution spend for runtime actions."""
 
-    def __init__(self, *, max_budget: float) -> None:
+    def __init__(self, *, max_budget: float, tenant_budgets: dict[str, float] | None = None) -> None:
         self.max_budget = max_budget
         self._spent = 0.0
+        self._tenant_spend: dict[str, float] = {}
+        self.tenant_budgets = tenant_budgets or {}
 
     @property
     def spent(self) -> float:
         return self._spent
 
-    def reserve(self, cost: float) -> None:
+    def reserve(self, cost: float, *, tenant_id: str = "default") -> None:
         incremental = max(float(cost), 0.0)
         if self._spent + incremental > self.max_budget:
             raise BudgetExceededError(f"Execution budget exceeded: {self._spent + incremental:.2f} > {self.max_budget:.2f}")
+        tenant_limit = self.tenant_budgets.get(tenant_id)
+        tenant_spend = self._tenant_spend.get(tenant_id, 0.0)
+        if tenant_limit is not None and tenant_spend + incremental > tenant_limit:
+            raise BudgetExceededError(f"Tenant budget exceeded: {tenant_spend + incremental:.2f} > {tenant_limit:.2f}")
         self._spent += incremental
+        self._tenant_spend[tenant_id] = tenant_spend + incremental
 
 
 class RuntimePipeline:
@@ -93,7 +103,8 @@ class RuntimePipeline:
     def execute(self, action: AgentAction) -> Any:
         self._validate_policy(action)
         self._enforce_approval(action)
-        self.budget_manager.reserve(action.estimated_cost)
+        self.budget_manager.reserve(action.estimated_cost, tenant_id=action.tenant_id)
+        runtime_metrics.inc("runtime_pipeline.actions")
 
         sandbox_result = self.sandbox_runner.run_callable(
             action.handler,
@@ -102,6 +113,8 @@ class RuntimePipeline:
             **action.kwargs,
         )
         if not sandbox_result.ok:
+            runtime_metrics.inc("runtime_pipeline.failures")
             raise RuntimeError(f"Sandbox execution failed: {sandbox_result.error}")
+        runtime_metrics.inc("runtime_pipeline.success")
         return sandbox_result.output
 

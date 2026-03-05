@@ -6,6 +6,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from monitoring.runtime_metrics import runtime_metrics
+
 
 @dataclass(slots=True)
 class LeadershipState:
@@ -25,11 +27,16 @@ class RedisCoordinator:
         if not acquired and self.redis.get(key) == node_id:
             self.redis.expire(key, lease_seconds)
             acquired = True
+        if acquired:
+            runtime_metrics.inc("coordination.leader_elections")
         return LeadershipState(node_id=node_id, is_leader=acquired, lease_seconds=lease_seconds)
 
     def claim_shard(self, shard_id: str, node_id: str, *, lease_seconds: int = 30) -> bool:
         key = f"{self.namespace}:shard:{shard_id}"
-        return bool(self.redis.set(key, node_id, nx=True, ex=lease_seconds))
+        claimed = bool(self.redis.set(key, node_id, nx=True, ex=lease_seconds))
+        if claimed:
+            runtime_metrics.inc("coordination.shards_claimed")
+        return claimed
 
     def renew_shard(self, shard_id: str, node_id: str, *, lease_seconds: int = 30) -> bool:
         key = f"{self.namespace}:shard:{shard_id}"

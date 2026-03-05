@@ -6,6 +6,8 @@ import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
 
+from monitoring.runtime_metrics import runtime_metrics
+
 
 @dataclass(slots=True)
 class AdmissionLimits:
@@ -14,6 +16,7 @@ class AdmissionLimits:
     max_concurrent_agents: int = 10_000
     max_spawn_rate_per_tenant_per_minute: int = 300
     max_global_spawn_burst_per_10s: int = 1_500
+    max_active_agents_per_tenant: int = 1_500
 
 
 @dataclass(slots=True)
@@ -44,9 +47,12 @@ class AgentAdmissionController:
 
         if not self._can_admit(request.tenant_id):
             self._start_queue.append(request)
+            runtime_metrics.inc("admission.queue_rejections")
+            runtime_metrics.set_gauge("admission.queued", float(len(self._start_queue)))
             return False
 
         self._admit(request)
+        runtime_metrics.inc("admission.accepted")
         return True
 
     def complete_agent(self, tenant_id: str) -> None:
@@ -54,6 +60,7 @@ class AgentAdmissionController:
 
         self._active_agents = max(0, self._active_agents - 1)
         self._active_by_tenant[tenant_id] = max(0, self._active_by_tenant[tenant_id] - 1)
+        runtime_metrics.set_gauge("admission.active_agents", float(self._active_agents))
 
     def pop_next_queued(self) -> AgentStartRequest | None:
         """Pop and admit one queued request if capacity is available."""
@@ -83,6 +90,8 @@ class AgentAdmissionController:
     def _can_admit(self, tenant_id: str) -> bool:
         if self._active_agents >= self.limits.max_concurrent_agents:
             return False
+        if self._active_by_tenant[tenant_id] >= self.limits.max_active_agents_per_tenant:
+            return False
         if len(self._tenant_spawn_timestamps[tenant_id]) >= self.limits.max_spawn_rate_per_tenant_per_minute:
             return False
         if len(self._global_spawn_timestamps) >= self.limits.max_global_spawn_burst_per_10s:
@@ -95,6 +104,11 @@ class AgentAdmissionController:
         self._active_by_tenant[request.tenant_id] += 1
         self._tenant_spawn_timestamps[request.tenant_id].append(now)
         self._global_spawn_timestamps.append(now)
+        runtime_metrics.set_gauge("admission.active_agents", float(self._active_agents))
+        runtime_metrics.set_gauge(
+            f"admission.active_agents.tenant.{request.tenant_id}",
+            float(self._active_by_tenant[request.tenant_id]),
+        )
 
     def _prune_windows(self) -> None:
         now = time.time()
