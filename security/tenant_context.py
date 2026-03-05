@@ -48,3 +48,15 @@ def tenant_context_scope(context: TenantContext) -> Iterator[TenantContext]:
         yield context
     finally:
         _CONTEXT.reset(token)
+
+
+def enforce_context_in_metadata(metadata: dict[str, str], *, context: TenantContext | None = None, strict: bool = True) -> dict[str, str]:
+    resolved = require_tenant_context(context, strict=strict)
+    metadata.setdefault("tenant_id", resolved.tenant_id)
+    metadata.setdefault("agent_id", resolved.agent_id)
+    metadata.setdefault("request_id", resolved.request_id)
+    if resolved.trace_id:
+        metadata.setdefault("trace_id", resolved.trace_id)
+    if resolved.task_id:
+        metadata.setdefault("task_id", resolved.task_id)
+    return metadata

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 
 @dataclass(slots=True)
@@ -64,3 +66,35 @@ class MemoryGovernor:
     def prune_vector(self, embedding: list[float], tenant_id: str) -> list[float]:
         max_dims = self.policy_for(tenant_id).max_vector_dimensions
         return embedding[:max_dims] if len(embedding) > max_dims else embedding
+
+
+class CompactionScheduler:
+    def __init__(self, governor: MemoryGovernor, tenant_ids: Iterable[str], *, interval_seconds: int = 300) -> None:
+        self.governor = governor
+        self.tenant_ids = list(tenant_ids)
+        self.interval_seconds = max(10, interval_seconds)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+
+        def _run() -> None:
+            while not self._stop.wait(self.interval_seconds):
+                for tenant_id in self.tenant_ids:
+                    self.governor.compact(tenant_id)
+
+        self._thread = threading.Thread(target=_run, name='memory-compaction', daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2)
+
+
+def schedule_periodic_compaction(governor: MemoryGovernor, tenant_ids: Iterable[str], *, interval_seconds: int = 300) -> CompactionScheduler:
+    scheduler = CompactionScheduler(governor, tenant_ids, interval_seconds=interval_seconds)
+    scheduler.start()
+    return scheduler

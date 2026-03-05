@@ -11,7 +11,7 @@ from typing import Any, Protocol
 
 from core.retry_engine import PERMANENT, RetryEngine, get_default_retry_engine
 from monitoring.structured_logging import log_event
-from security.tenant_context import require_tenant_context
+from security.tenant_context import enforce_context_in_metadata, require_tenant_context
 
 
 @dataclass(slots=True)
@@ -166,7 +166,7 @@ class DistributedTaskQueue:
         return f"{self.queue_name}:dlq"
 
     def enqueue_task(self, task: QueueTask | dict[str, Any]) -> QueueTask:
-        require_tenant_context(strict=self.enforce_tenant_context)
+        enforce_context_in_metadata(task.get("metadata", {}) if isinstance(task, dict) else task.metadata, strict=self.enforce_tenant_context)
         if isinstance(task, dict):
             task = QueueTask(
                 task_id=task.get("task_id", f"task-{uuid.uuid4().hex[:12]}"),

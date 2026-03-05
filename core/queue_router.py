@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass
 
 from core.task_queue import DistributedTaskQueue, QueueTask
+from security.tenant_context import enforce_context_in_metadata
 
 
 @dataclass(slots=True)
@@ -35,6 +36,14 @@ class QueueShardRouter:
             if shard not in self.shard_queues:
                 self.tenant_assignments[tenant] = self._hash_shard(tenant)
 
+    def scale_shards(self, shard_queues: dict[str, DistributedTaskQueue]) -> None:
+        """Alias for dynamic shard topology updates."""
+        self.rebalance(shard_queues)
+
+    def worker_subscriptions(self) -> dict[str, DistributedTaskQueue]:
+        """Expose shard queues for worker subscription bootstrapping."""
+        return dict(self.shard_queues)
+
     def _hash_shard(self, tenant_id: str) -> str:
         shards = sorted(self.shard_queues)
         digest = int(hashlib.sha256(tenant_id.encode("utf-8")).hexdigest(), 16)
@@ -44,6 +53,7 @@ class QueueShardRouter:
         return self.tenant_assignments.get(tenant_id, self._hash_shard(tenant_id))
 
     def route_task(self, task: QueueTask) -> str:
+        enforce_context_in_metadata(task.metadata, strict=False)
         tenant_id = str(task.metadata.get("tenant_id", "default"))
         shard_name = self.shard_for_tenant(tenant_id)
         task.metadata["queue_shard"] = shard_name
