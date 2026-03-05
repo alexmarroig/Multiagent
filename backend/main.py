@@ -5,10 +5,16 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import sys
+from pathlib import Path
 
 from celery import Celery
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
 
 from api.routes_agents import router as agents_router
 from api.routes_auth import router as auth_router
