@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
@@ -46,6 +47,8 @@ class Orchestrator:
         mailbox: AgentMailbox,
         task_queue: DistributedTaskQueue | None = None,
         max_schedule_tasks: int = 500,
+        max_active_runs_per_tenant: int = 128,
+        max_spawn_requests_per_run: int = 100,
     ) -> None:
         self.task_graph = task_graph
         self.autonomy_engine = autonomy_engine
@@ -59,44 +62,59 @@ class Orchestrator:
         self.mailbox = mailbox
         self.task_queue = task_queue
         self.max_schedule_tasks = max(1, max_schedule_tasks)
+        self.max_active_runs_per_tenant = max(1, max_active_runs_per_tenant)
+        self.max_spawn_requests_per_run = max(1, max_spawn_requests_per_run)
+        self._active_runs_by_tenant: dict[str, int] = defaultdict(int)
 
     def run(self, context: OrchestrationContext, objective: dict[str, Any]) -> dict[str, Any]:
-        self.telemetry.record("orchestration.started", {"request_id": context.request_id, "objective": objective})
-        policy_decision = self.policy_engine.evaluate(objective, actor=context.initiator)
-        if not policy_decision.allowed:
-            return {"status": "rejected", "reason": policy_decision.reason}
+        if self._active_runs_by_tenant[context.tenant_id] >= self.max_active_runs_per_tenant:
+            self.telemetry.record("orchestration.tenant_concurrency_rejected", {"request_id": context.request_id, "tenant_id": context.tenant_id})
+            return {"status": "deferred", "reason": "tenant_concurrency_limit"}
 
-        if policy_decision.requires_human_approval:
-            approved = self.approval_service.request_approval(context.request_id, objective, policy_decision.reason)
-            if not approved:
-                return {"status": "rejected", "reason": "human_approval_denied"}
-
-        graph_id = context.request_id
-        if hasattr(self.task_graph, "create_graph"):
-            graph_id = self.task_graph.create_graph(context.request_id, objective)
-        elif hasattr(self.task_graph, "ingest_plan"):
-            self.task_graph.ingest_plan(objective.get("tasks", []))
-        if self.task_queue is not None and not self.task_queue.can_schedule_new_tasks():
-            self.telemetry.record("orchestration.backpressure_rejected", {"request_id": context.request_id})
-            return {"status": "deferred", "reason": "queue_backpressure"}
-
-        schedule = self.scheduler.generate_plan(graph_id, objective)
-        if isinstance(schedule, list) and len(schedule) > self.max_schedule_tasks:
-            schedule = schedule[: self.max_schedule_tasks]
-            self.telemetry.record("orchestration.schedule_truncated", {"request_id": context.request_id, "max_schedule_tasks": self.max_schedule_tasks})
+        self._active_runs_by_tenant[context.tenant_id] += 1
         try:
+            self.telemetry.record("orchestration.started", {"request_id": context.request_id, "objective": objective})
+            policy_decision = self.policy_engine.evaluate(objective, actor=context.initiator)
+            if not policy_decision.allowed:
+                return {"status": "rejected", "reason": policy_decision.reason}
+
+            if policy_decision.requires_human_approval:
+                approved = self.approval_service.request_approval(context.request_id, objective, policy_decision.reason)
+                if not approved:
+                    return {"status": "rejected", "reason": "human_approval_denied"}
+
+            graph_id = context.request_id
+            if hasattr(self.task_graph, "create_graph"):
+                graph_id = self.task_graph.create_graph(context.request_id, objective)
+            elif hasattr(self.task_graph, "ingest_plan"):
+                self.task_graph.ingest_plan(objective.get("tasks", []))
+            if self.task_queue is not None and not self.task_queue.can_schedule_new_tasks():
+                self.telemetry.record("orchestration.backpressure_rejected", {"request_id": context.request_id})
+                return {"status": "deferred", "reason": "queue_backpressure"}
+
+            spawn_requests = int(objective.get("spawn_count", 0) or 0)
+            if spawn_requests > self.max_spawn_requests_per_run:
+                self.telemetry.record("orchestration.spawn_capped", {"request_id": context.request_id, "spawn_requested": spawn_requests, "spawn_cap": self.max_spawn_requests_per_run})
+                objective = {**objective, "spawn_count": self.max_spawn_requests_per_run}
+
+            schedule = self.scheduler.generate_plan(graph_id, objective)
+            if isinstance(schedule, list) and len(schedule) > self.max_schedule_tasks:
+                schedule = schedule[: self.max_schedule_tasks]
+                self.telemetry.record("orchestration.schedule_truncated", {"request_id": context.request_id, "max_schedule_tasks": self.max_schedule_tasks})
             run_report = self.autonomy_engine.execute(graph_id=graph_id, schedule=schedule)
+            guarded_report = self.guardrails.enforce(run_report, budget_limit_usd=context.budget_limit_usd)
+            placement = self.load_manager.snapshot()
+
+            result = {
+                "status": "completed",
+                "graph_id": graph_id,
+                "run_report": guarded_report,
+                "worker_state": placement,
+            }
+            self.telemetry.record("orchestration.completed", result)
+            return result
         except Exception as exc:  # noqa: BLE001
             self.telemetry.record("orchestration.failed", {"request_id": context.request_id, "error": str(exc)})
-            return {"status": "failed", "graph_id": graph_id, "reason": str(exc)}
-        guarded_report = self.guardrails.enforce(run_report, budget_limit_usd=context.budget_limit_usd)
-        placement = self.load_manager.snapshot()
-
-        result = {
-            "status": "completed",
-            "graph_id": graph_id,
-            "run_report": guarded_report,
-            "worker_state": placement,
-        }
-        self.telemetry.record("orchestration.completed", result)
-        return result
+            return {"status": "failed", "graph_id": context.request_id, "reason": str(exc)}
+        finally:
+            self._active_runs_by_tenant[context.tenant_id] = max(0, self._active_runs_by_tenant[context.tenant_id] - 1)

@@ -71,6 +71,8 @@ class RuntimePipeline:
         sandbox_runner: SandboxRunner,
         approval_queue: ApprovalQueue,
         max_actions_per_tenant: int = 1000,
+        max_actions_per_minute_per_tenant: int = 240,
+        max_tool_invocations_per_tenant: dict[str, int] | None = None,
         action_cooldown_seconds: float = 0.0,
     ) -> None:
         self.policy_engine = policy_engine
@@ -78,9 +80,13 @@ class RuntimePipeline:
         self.sandbox_runner = sandbox_runner
         self.approval_queue = approval_queue
         self.max_actions_per_tenant = max(1, max_actions_per_tenant)
+        self.max_actions_per_minute_per_tenant = max(1, max_actions_per_minute_per_tenant)
+        self.max_tool_invocations_per_tenant = max_tool_invocations_per_tenant or {}
         self.action_cooldown_seconds = max(0.0, action_cooldown_seconds)
         self._tenant_action_counts: dict[str, int] = {}
         self._last_action_at: dict[str, float] = {}
+        self._tenant_tool_invocations: dict[str, dict[str, int]] = {}
+        self._tenant_rate_windows: dict[str, tuple[float, int]] = {}
 
     def _validate_policy(self, action: AgentAction) -> None:
         decision = self.policy_engine.evaluate(
@@ -113,9 +119,20 @@ class RuntimePipeline:
         if actions >= self.max_actions_per_tenant:
             raise BudgetExceededError(f"Tenant action limit exceeded for {tenant}")
         now = time.monotonic()
+        window_started_at, window_count = self._tenant_rate_windows.get(tenant, (now, 0))
+        if now - window_started_at >= 60.0:
+            window_started_at, window_count = now, 0
+        if window_count >= self.max_actions_per_minute_per_tenant:
+            raise RuntimeError(f"Tenant action rate limited for {tenant}")
+        tool_counts = self._tenant_tool_invocations.setdefault(tenant, {})
+        tool_count = tool_counts.get(action.tool_name, 0)
+        per_tool_limit = self.max_tool_invocations_per_tenant.get(action.tool_name)
+        if per_tool_limit is not None and tool_count >= per_tool_limit:
+            raise RuntimeError(f"Tool invocation limit exceeded for {action.tool_name} under tenant {tenant}")
         last = self._last_action_at.get(tenant)
         if last is not None and (now - last) < self.action_cooldown_seconds:
             raise RuntimeError(f"Action throttled for tenant {tenant}")
+        self._tenant_rate_windows[tenant] = (window_started_at, window_count + 1)
 
     def execute(self, action: AgentAction) -> Any:
         self._validate_policy(action)
@@ -135,7 +152,8 @@ class RuntimePipeline:
             raise RuntimeError(f"Sandbox execution failed: {sandbox_result.error}")
         tenant = action.tenant_id or "default"
         self._tenant_action_counts[tenant] = self._tenant_action_counts.get(tenant, 0) + 1
+        tool_counts = self._tenant_tool_invocations.setdefault(tenant, {})
+        tool_counts[action.tool_name] = tool_counts.get(action.tool_name, 0) + 1
         self._last_action_at[tenant] = time.monotonic()
         runtime_metrics.inc("runtime_pipeline.success")
         return sandbox_result.output
-
