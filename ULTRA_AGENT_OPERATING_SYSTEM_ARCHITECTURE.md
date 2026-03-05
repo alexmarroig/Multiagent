@@ -556,3 +556,39 @@ This design qualifies because it includes the essential enterprise properties:
 6. **Developer and user accessibility** through visual graph-based builder and instant deployment flows.
 
 To be production-certified, the platform should pass defined scale and chaos tests (including 10,000-agent scenarios), meet SLOs, and complete security/compliance audits.
+
+---
+
+## EXECUÇÃO IMEDIATA DAS FASES (AÇÃO)
+
+Esta seção transforma o roadmap em execução direta com entregáveis objetivos.
+
+### Fase 1 (Semanas 1–8) — Runtime Core
+- Entregar `Agent Registry`, `Lifecycle Manager`, `Scheduler`, `Runtime Engine` e `Admission Controller` em ambiente de staging.
+- Publicar contratos de API versionados (`/v1/agents`, `/v1/deployments`, `/v1/runs`).
+- Definir SLO inicial: disponibilidade de controle >= 99.9%.
+- Critério de aceite: criação/deploy/execução de 500 agentes concorrentes sem perda de eventos.
+
+### Fase 2 (Semanas 9–16) — Backbone Distribuído
+- Ativar stream durável (Kafka/NATS) com replay de eventos.
+- Implantar filas shardizadas por tenant e prioridade.
+- Colocar autoscaling básico de workers por profundidade de fila.
+- Critério de aceite: throughput sustentado >= 2.000 tasks/s com recuperação após falha de worker.
+
+### Fase 3 (Semanas 17–24) — Governança e Custos
+- Implementar ledger global de quota com débito pré-execução obrigatório.
+- Integrar bloqueios por orçamento diário/mensal por tenant e agente.
+- Expor dashboard de custos por rota de modelo e por ferramenta.
+- Critério de aceite: 100% das chamadas LLM/tool com débito auditável.
+
+### Fase 4 (Semanas 25–32) — Visual Builder
+- Entregar canvas drag-and-drop com compilação para `agent graph JSON`.
+- Disponibilizar templates operacionais (support, research, workflow, compliance).
+- Publicar pipeline de deploy em 1 clique com auto-registro no cluster.
+- Critério de aceite: deploy P95 < 5s para template padrão.
+
+### Fase 5 (Semanas 33–40) — Enterprise Observability e Security
+- Instrumentar OpenTelemetry fim-a-fim com correlação obrigatória (`trace_id`, `agent_id`, `tenant_id`, `task_id`).
+- Endurecer sandbox de ferramentas com isolamento de rede e filesystem.
+- Executar teste de escala 10.000 agentes + cenários de caos.
+- Critério de aceite: estabilidade de fila e custo dentro dos limites definidos em SLO/SLA.
