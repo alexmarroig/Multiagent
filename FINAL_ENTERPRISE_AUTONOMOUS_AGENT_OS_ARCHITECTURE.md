@@ -365,3 +365,27 @@ Scale **task execution slots**, not agent objects. Agents remain logical identit
 # ENTERPRISE AUTONOMOUS AGENT OPERATING SYSTEM
 
 This final architecture is classified as an **ENTERPRISE AUTONOMOUS AGENT OPERATING SYSTEM** because it combines durable autonomous execution, distributed worker fabrics, persistent graph and event state, policy-governed tooling, hierarchical supervision, human governance, and closed-loop learning/operations at enterprise scale.
+
+---
+
+## IMPLEMENTAÇÃO DIRETA DO ROADMAP (AÇÃO IMEDIATA)
+
+### Priority 0 — Reliability Foundation
+- Congelar padrões de resiliência (retry/backoff/idempotência) no runtime.
+- Garantir monitoramento de lag de fila e saturação de workers.
+
+### Priority 1 — Governance & Supervision Core
+- Ativar políticas de admissão, spawn limit e budget enforcement.
+- Publicar trilha de decisão auditável para bloqueios e aprovações.
+
+### Priority 2 — Observability & Operations
+- Correlacionar métricas, logs e traces por `trace_id/agent_id/tenant_id/task_id`.
+- Criar painéis de saúde operacional e alertas de risco de swarm.
+
+### Priority 3 — Learning Ops Maturity
+- Padronizar avaliação pós-execução e retenção de memória resumida.
+- Fechar ciclo de melhoria com feedback supervisionado.
+
+### Priority 4 — Enterprise Hardening
+- Endurecer isolamento de execução de ferramentas e segredos.
+- Validar readiness com testes de escala e recuperação regional.

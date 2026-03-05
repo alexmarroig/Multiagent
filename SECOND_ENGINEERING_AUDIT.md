@@ -134,3 +134,27 @@ Structured logging, in-memory metrics, API/dashboard exposure, and alert/SLO doc
     - Secret rotation automation, signed artifacts, and compliance controls.
 15. **Operational readiness**
     - Disaster recovery tests, chaos drills, and release orchestration gates.
+
+---
+
+## FASES PRIORIZADAS — EXECUÇÃO PRÁTICA
+
+### Priority 0 (Weeks 1–4)
+- Fechar lacunas de confiabilidade com runbooks, alarmes e SLOs mínimos.
+- Validar MTTR com exercícios de incidente controlado.
+
+### Priority 1 (Weeks 5–8)
+- Implantar governança de custos e aprovação de ações críticas.
+- Ativar controles de loop e de crescimento de swarm.
+
+### Priority 2 (Weeks 9–12)
+- Consolidar observabilidade unificada (metrics/logs/traces).
+- Operacionalizar dashboards por tenant e por cluster.
+
+### Priority 3 (Weeks 13–16)
+- Implementar melhorias contínuas baseadas em replay de execuções.
+- Padronizar quality gates para atualização de prompts/políticas.
+
+### Priority 4 (Weeks 17+)
+- Concluir hardening enterprise (RBAC avançado, isolamento e compliance).
+- Certificar escala alvo com testes de 10.000 agentes concorrentes.

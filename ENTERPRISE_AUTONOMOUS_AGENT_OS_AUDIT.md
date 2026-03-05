@@ -366,3 +366,27 @@ flowchart LR
 - **After Phases 1–2**: Level 3.5/5 (robust autonomous platform).
 - **After Phases 3–5**: Level 5/5 (enterprise autonomous agent operating system).
 
+
+---
+
+## EXECUÇÃO DAS FASES RECOMENDADAS
+
+### Phase 1 — Hardening foundations
+- Aplicar baseline de confiabilidade (timeouts, retries, circuit breakers).
+- Cobrir componentes críticos com testes de falha controlada.
+
+### Phase 2 — Enterprise autonomy core
+- Formalizar loop observe-plan-act-reflect com checkpoints.
+- Integrar hierarquia de agentes (coordinator/worker/utility).
+
+### Phase 3 — Supervision and governance
+- Enforçar admission control e governança de spawn.
+- Ativar controles de orçamento e cotas por tenant.
+
+### Phase 4 — Data acquisition and intelligence
+- Consolidar gateway de modelos com cache semântico.
+- Instrumentar avaliação de qualidade/custo por rota de modelo.
+
+### Phase 5 — Reliability and scale excellence
+- Executar campanha de carga de 100/1.000/10.000 agentes.
+- Rodar caos + soak test e fechar gaps de estabilidade.

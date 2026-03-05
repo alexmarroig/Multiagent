@@ -439,3 +439,32 @@ flowchart TD
 ### Conclusion
 
 The proposed design meets the criteria for an **ENTERPRISE AGENT OPERATING SYSTEM** with robust foundations for reliability, governance, and large-scale autonomous operation.
+
+---
+
+## FASES EM EXECUÇÃO (PLANO OPERACIONAL)
+
+### Phase 1 — Core Runtime (Execução)
+- Provisionar serviços de registro, ciclo de vida e runtime com HA.
+- Publicar testes de contrato para APIs de agente.
+- Meta operacional: 300 agentes concorrentes em staging.
+
+### Phase 2 — Distributed Scaling (Execução)
+- Habilitar filas particionadas + roteamento dinâmico por tenant.
+- Implementar replay de eventos e idempotência de consumo.
+- Meta operacional: recuperação automática após reinício de nó.
+
+### Phase 3 — Cost Governance (Execução)
+- Enforce de budget-check antes de cada chamada de modelo/ferramenta.
+- Implementar alertas de estouro de custo em tempo real.
+- Meta operacional: zero execução sem débito registrado.
+
+### Phase 4 — Multi-Channel Integrations (Execução)
+- Conectar Slack, Telegram e Webhook com sessão conversacional unificada.
+- Adicionar DLQ por canal para mensagens inválidas.
+- Meta operacional: entrega ordenada por sessão.
+
+### Phase 5 — Enterprise Hardening (Execução)
+- Fortalecer RBAC por escopo e segregação por tenant.
+- Isolar execução de tools via sandbox/container.
+- Meta operacional: trilha completa de auditoria para ações privilegiadas.
