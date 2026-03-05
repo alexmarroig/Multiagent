@@ -2,6 +2,7 @@ from core.autoscaling_adapter import AutoscalingSignal, KEDAQueueAdapter, Kubern
 from core.quota_ledger import DurableQuotaLedger, InMemoryQuotaStore, QuotaDebit, QuotaExceededError, QuotaPolicy
 from core.queue_router import QueueShardRouter
 from core.task_queue import DistributedTaskQueue, InMemoryQueueBackend, QueueTask
+from core.token_budget_scheduler import TokenBudgetConfig, TokenBudgetScheduler
 
 
 def test_quota_ledger_enforces_limits() -> None:
@@ -34,3 +35,9 @@ def test_autoscaling_adapters_compute_replica_targets() -> None:
     signal = AutoscalingSignal(queue_depth=800, worker_utilization=0.9, p95_latency_ms=1200)
     assert KubernetesHPAAdapter().desired_replicas(signal) >= 2
     assert KEDAQueueAdapter().desired_replicas(signal) >= 2
+
+
+def test_token_budget_scheduler_reservation_enforces_hard_limit() -> None:
+    scheduler = TokenBudgetScheduler(TokenBudgetConfig(default_tenant_budget=100, hard_limit_factor=1.1))
+    assert scheduler.reserve(tenant_id="t1", tokens=80)
+    assert not scheduler.reserve(tenant_id="t1", tokens=40)

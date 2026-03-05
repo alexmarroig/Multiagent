@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
+from monitoring.runtime_metrics import runtime_metrics
+
 from core.task_queue import DistributedTaskQueue, QueueTask
 from security.tenant_context import enforce_context_in_metadata
 
@@ -49,8 +51,16 @@ class QueueShardRouter:
         digest = int(hashlib.sha256(tenant_id.encode("utf-8")).hexdigest(), 16)
         return shards[digest % len(shards)]
 
+    def _select_least_loaded_shard(self) -> str:
+        return min(self.shard_queues, key=lambda name: self.shard_queues[name].queue_size())
+
     def shard_for_tenant(self, tenant_id: str) -> str:
-        return self.tenant_assignments.get(tenant_id, self._hash_shard(tenant_id))
+        if tenant_id in self.tenant_assignments:
+            return self.tenant_assignments[tenant_id]
+        candidate = self._hash_shard(tenant_id)
+        if self.shard_queues[candidate].is_under_pressure():
+            return self._select_least_loaded_shard()
+        return candidate
 
     def route_task(self, task: QueueTask) -> str:
         enforce_context_in_metadata(task.metadata, strict=False)
@@ -58,4 +68,5 @@ class QueueShardRouter:
         shard_name = self.shard_for_tenant(tenant_id)
         task.metadata["queue_shard"] = shard_name
         self.shard_queues[shard_name].enqueue_task(task)
+        runtime_metrics.inc(f"queue.route.shard.{shard_name}")
         return shard_name

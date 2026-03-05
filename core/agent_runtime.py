@@ -8,6 +8,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol
 
+from core.agent_admission_controller import AgentAdmissionController, AgentStartRequest
+from monitoring.runtime_metrics import runtime_metrics
+
 
 class RuntimeStatus(str, Enum):
     INITIALIZING = "initializing"
@@ -43,7 +46,7 @@ class RuntimeHealth:
 class AgentRuntime:
     """Maintains agent lifecycle, loop execution, budgets, and health telemetry."""
 
-    def __init__(self, *, max_runtime_cost: float = 25.0, logger: logging.Logger | None = None) -> None:
+    def __init__(self, *, max_runtime_cost: float = 25.0, logger: logging.Logger | None = None, admission_controller: AgentAdmissionController | None = None) -> None:
         self.max_runtime_cost = max_runtime_cost
         self.logger = logger or logging.getLogger(__name__)
         self.status = RuntimeStatus.INITIALIZING
@@ -52,16 +55,21 @@ class AgentRuntime:
         self._iterations = 0
         self._spent_cost = 0.0
         self._last_error: str | None = None
+        self.admission_controller = admission_controller or AgentAdmissionController()
 
     def initialize_agents(self, agents: list[AgentProfile]) -> None:
         self._agents = {agent.agent_id: agent for agent in agents}
         self.status = RuntimeStatus.RUNNING
 
-    def create_specialized_agent(self, skill: str) -> AgentProfile:
+    def create_specialized_agent(self, skill: str, *, tenant_id: str = "default") -> AgentProfile:
         """Spawn a new specialized agent when no existing agent has the required skill."""
         agent_id = f"agent-{len(self._agents) + 1:03d}"
-        profile = AgentProfile(agent_id=agent_id, skills={skill}, metadata={"spawned": True})
+        admitted = self.admission_controller.request_start(AgentStartRequest(agent_id=agent_id, tenant_id=tenant_id))
+        if not admitted:
+            raise RuntimeError("agent admission controller rejected spawn")
+        profile = AgentProfile(agent_id=agent_id, skills={skill}, metadata={"spawned": True, "tenant_id": tenant_id})
         self._agents[agent_id] = profile
+        runtime_metrics.inc("agent.spawned")
         self.logger.info("Spawned specialized agent %s for skill %s", agent_id, skill)
         return profile
 
@@ -75,6 +83,7 @@ class AgentRuntime:
         self._spent_cost += max(incremental_cost, 0.0)
         if self._spent_cost > self.max_runtime_cost:
             self.status = RuntimeStatus.DEGRADED
+            runtime_metrics.inc("runtime.cost_budget_exceeded")
             self.logger.warning("Runtime budget exceeded: %.2f > %.2f", self._spent_cost, self.max_runtime_cost)
             return False
         return True

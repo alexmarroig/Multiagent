@@ -6,6 +6,8 @@ import hashlib
 import math
 from dataclasses import dataclass
 
+from monitoring.runtime_metrics import runtime_metrics
+
 
 def _default_embedding(text: str) -> list[float]:
     """Deterministic lightweight embedding fallback for tests/offline mode."""
@@ -28,6 +30,8 @@ class SemanticCacheEntry:
     prompt: str
     response: str
     embedding: list[float]
+    tenant_id: str = "default"
+    model: str = "default"
 
 
 class SemanticLLMCache:
@@ -38,26 +42,31 @@ class SemanticLLMCache:
         self.max_entries = max_entries
         self._entries: list[SemanticCacheEntry] = []
 
-    def lookup(self, prompt: str, embedding: list[float] | None = None) -> str | None:
+    def lookup(self, prompt: str, embedding: list[float] | None = None, *, tenant_id: str = "default", model: str = "default") -> str | None:
         vector = embedding or _default_embedding(prompt)
         best_score = 0.0
         best_response: str | None = None
 
         for entry in self._entries:
+            if entry.tenant_id != tenant_id or entry.model != model:
+                continue
             score = _cosine_similarity(vector, entry.embedding)
             if score > best_score:
                 best_score = score
                 best_response = entry.response
 
         if best_score >= self.similarity_threshold:
+            runtime_metrics.inc("semantic_cache.hit")
             return best_response
+        runtime_metrics.inc("semantic_cache.miss")
         return None
 
-    def store(self, prompt: str, response: str, embedding: list[float] | None = None) -> None:
+    def store(self, prompt: str, response: str, embedding: list[float] | None = None, *, tenant_id: str = "default", model: str = "default") -> None:
         vector = embedding or _default_embedding(prompt)
-        self._entries.append(SemanticCacheEntry(prompt=prompt, response=response, embedding=vector))
+        self._entries.append(SemanticCacheEntry(prompt=prompt, response=response, embedding=vector, tenant_id=tenant_id, model=model))
         if len(self._entries) > self.max_entries:
             self._entries.pop(0)
+        runtime_metrics.set_gauge("semantic_cache.size", float(len(self._entries)))
 
     def size(self) -> int:
         return len(self._entries)

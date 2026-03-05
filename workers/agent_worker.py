@@ -11,6 +11,7 @@ from typing import Any, Protocol
 from communication.event_bus import Event, EventBus
 from core.task_queue import DistributedTaskQueue, QueueTask
 from core.retry_engine import RetryEngine, get_default_retry_engine
+from monitoring.runtime_metrics import runtime_metrics
 from monitoring.tracing import get_tracer
 
 
@@ -55,6 +56,7 @@ class AgentWorker:
         poll_interval_seconds: float = 0.2,
         heartbeat_interval_seconds: float = 1.0,
         retry_engine: RetryEngine | None = None,
+        max_batch_size: int = 4,
     ) -> None:
         self.worker_id = worker_id
         self.queue = queue
@@ -69,6 +71,7 @@ class AgentWorker:
         self._last_heartbeat = 0.0
         self._tracer = get_tracer()
         self.retry_engine = retry_engine or get_default_retry_engine()
+        self.max_batch_size = max(1, max_batch_size)
 
     def _emit_heartbeat(self) -> None:
         now = time.time()
@@ -102,9 +105,11 @@ class AgentWorker:
                 self.queue.acknowledge_task(task)
                 self.telemetry.processed_tasks += 1
                 self.event_bus.report_completion(task_id=task.task_id, worker_id=self.worker_id, result=result)
+                runtime_metrics.inc("worker.tasks_processed")
             except Exception as exc:  # noqa: BLE001
                 self.telemetry.failed_tasks += 1
                 self.queue.fail_task(task, error=str(exc), exc=exc)
+                runtime_metrics.inc("worker.tasks_failed")
                 self.event_bus.publish_event(
                     Event(
                         topic="worker.task_failed",
@@ -113,15 +118,25 @@ class AgentWorker:
                 )
         return True
 
+
+    def process_batch(self) -> int:
+        processed = 0
+        for _ in range(self.max_batch_size):
+            if not self.process_once():
+                break
+            processed += 1
+        runtime_metrics.set_gauge("worker.utilization", float(processed / self.max_batch_size))
+        return processed
+
     def run_forever(self) -> None:
         self._running = True
         while self._running:
             self._emit_heartbeat()
-            processed = self.process_once()
+            processed = self.process_batch()
             if self.queue.is_under_pressure():
                 time.sleep(self.poll_interval_seconds * 2)
                 continue
-            if not processed:
+            if processed == 0:
                 time.sleep(self.poll_interval_seconds)
 
     def start_background(self) -> None:

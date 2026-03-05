@@ -8,6 +8,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from monitoring.runtime_metrics import runtime_metrics
+
 
 @dataclass(slots=True)
 class Event:
@@ -49,11 +51,16 @@ class DurableEventBus:
     def publish_event(self, event: Event) -> str:
         message = {"topic": event.topic, "payload": json.dumps(event.payload), "timestamp": str(event.timestamp)}
         if self.redis is not None:
-            message_id = str(self.redis.xadd(self.stream_name, message))
+            try:
+                message_id = str(self.redis.xadd(self.stream_name, message))
+            except Exception:
+                runtime_metrics.inc("event_bus.publish_failures")
+                raise
         else:
             event.event_id = event.event_id or f"local-{uuid.uuid4().hex}"
             message_id = event.event_id
         self._dispatch_local(Event(topic=event.topic, payload=event.payload, event_id=message_id, timestamp=event.timestamp))
+        runtime_metrics.inc("event_bus.published")
         return message_id
 
     def replay(self, callback: Subscriber, *, topic: str | None = None, from_id: str = "0-0", count: int = 100) -> list[Event]:
@@ -88,6 +95,7 @@ class DurableEventBus:
                 event = Event(topic=data["topic"], payload=json.loads(data["payload"]), event_id=message_id, timestamp=float(data.get("timestamp", time.time())))
                 callback(event)
                 self.redis.xack(self.stream_name, group, message_id)
+                runtime_metrics.inc("event_bus.consumed")
                 self._dispatch_local(event)
                 processed += 1
         return processed

@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from core.retry_engine import PERMANENT, RetryEngine, get_default_retry_engine
+from monitoring.runtime_metrics import runtime_metrics
 from monitoring.structured_logging import log_event
 from security.tenant_context import enforce_context_in_metadata, require_tenant_context
 
@@ -177,6 +178,7 @@ class DistributedTaskQueue:
                 metadata=task.get("metadata", {}),
             )
         self.backend.push(self.queue_name, task.to_json())
+        runtime_metrics.inc("queue.enqueued")
         self._refresh_pressure_state()
         return task
 
@@ -185,6 +187,7 @@ class DistributedTaskQueue:
         raw = self.backend.pop(self.queue_name, timeout_seconds=timeout_seconds)
         self._refresh_pressure_state()
         if raw is None:
+            runtime_metrics.set_gauge(f"queue.depth.{self.queue_name}", float(self.queue_size()))
             return None
         task = QueueTask.from_json(raw)
         next_attempt_at = float(task.metadata.get("next_attempt_at", 0.0) or 0.0)
@@ -193,11 +196,14 @@ class DistributedTaskQueue:
             self.backend.ack(self.processing_queue_name, raw)
             return None
         self._inflight[task.task_id] = (task, time.time() + self.visibility_timeout_seconds)
+        runtime_metrics.inc("queue.dequeued")
+        runtime_metrics.set_gauge(f"queue.depth.{self.queue_name}", float(self.queue_size()))
         return task
 
     def acknowledge_task(self, task: QueueTask) -> None:
         self._inflight.pop(task.task_id, None)
         self.backend.ack(self.processing_queue_name, task.to_json())
+        runtime_metrics.inc("queue.acked")
 
     def fail_task(self, task: QueueTask, *, error: str, exc: BaseException | None = None) -> None:
         self._inflight.pop(task.task_id, None)
@@ -213,6 +219,7 @@ class DistributedTaskQueue:
         if classification == PERMANENT or attempts >= self.max_retries:
             self.backend.push(self.dead_letter_queue_name, task.to_json())
             self.backend.ack(self.processing_queue_name, task.to_json())
+            runtime_metrics.inc("queue.dead_lettered")
             log_event(
                 self._logger,
                 component="queue",
@@ -227,6 +234,7 @@ class DistributedTaskQueue:
         task.metadata["next_attempt_at"] = time.time() + delay_seconds
         self.backend.push(self.queue_name, task.to_json())
         self.backend.ack(self.processing_queue_name, task.to_json())
+        runtime_metrics.inc("queue.retried")
         log_event(
             self._logger,
             component="queue",
@@ -259,6 +267,7 @@ class DistributedTaskQueue:
 
     def _refresh_pressure_state(self) -> bool:
         size = self.queue_size()
+        runtime_metrics.set_gauge(f"queue.depth.{self.queue_name}", float(size))
         if not self._scheduling_paused and size > self.queue_high_watermark:
             self._scheduling_paused = True
             log_event(self._logger, component="scheduler", event="queue_backpressure_on", severity="warning", pending=size, high_watermark=self.queue_high_watermark)
