@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from core.execution_gateway import ExecutionGateway, GatewayPolicy
-from backend.tools.runtime_tools import resolve_tools
+from tools.runtime_tools import resolve_tools
 from tools.sandbox_runner import SandboxResult
 
 
@@ -20,7 +20,7 @@ def test_resolved_tools_execute_via_runtime_pipeline(monkeypatch) -> None:
     stub = _RunnerStub()
 
     monkeypatch.setattr(
-        "backend.tools.runtime_tools._gateway",
+        "tools.runtime_tools._gateway",
         lambda: ExecutionGateway(
             sandbox_runner=stub,
             policy=GatewayPolicy(require_approval_categories=set(), blocked_tools=set(), max_tool_cost=500.0),

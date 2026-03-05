@@ -11,14 +11,14 @@ from urllib.parse import urlparse
 import httpx
 
 from core.execution_gateway import ExecutionGateway, GatewayPolicy
-from backend.models.schemas import NodeConfig
-from backend.tools.browser_tools import browse_website, search_hotels
-from backend.tools.circuit_breaker import CircuitOpenError, circuit_breakers
-from backend.tools.excel_tools import create_excel_spreadsheet
-from backend.tools.finance_tools import get_stock_data
+from models.schemas import NodeConfig
+from tools.browser_tools import browse_website, search_hotels
+from tools.circuit_breaker import CircuitOpenError, circuit_breakers
+from tools.excel_tools import create_excel_spreadsheet
+from tools.finance_tools import get_stock_data
 from tools.sandbox_runner import SandboxPolicy
-from backend.tools.search_tools import web_search
-from backend.tools.tool_ids import normalize_tool_ids
+from tools.search_tools import web_search
+from tools.tool_ids import normalize_tool_ids
 
 ToolFn = Callable[..., str]
 

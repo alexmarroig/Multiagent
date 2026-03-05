@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from backend.main import app
-from backend.models.schemas import AgentType
+from main import app
+from models.schemas import AgentType
 
 
 def test_templates_only_use_supported_agents() -> None:
