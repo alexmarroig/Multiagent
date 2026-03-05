@@ -10,6 +10,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from memory.memory_governor import MemoryGovernor
+from security.tenant_context import require_tenant_context
+
 
 @dataclass(slots=True)
 class MemoryEntry:
@@ -23,9 +26,11 @@ class MemoryEntry:
 class DistributedMemory:
     """Persists task history/state in SQL and supports semantic retrieval via vector similarity."""
 
-    def __init__(self, db_path: str = "agentos_memory.db") -> None:
+    def __init__(self, db_path: str = "agentos_memory.db", *, memory_governor: MemoryGovernor | None = None, enforce_tenant_context: bool = False) -> None:
         self.db_path = Path(db_path)
         self._conn = sqlite3.connect(self.db_path)
+        self.memory_governor = memory_governor or MemoryGovernor(str(self.db_path))
+        self.enforce_tenant_context = enforce_tenant_context
         self._conn.row_factory = sqlite3.Row
         self._bootstrap()
 
@@ -62,6 +67,8 @@ class DistributedMemory:
         self._conn.commit()
 
     def store_task_history(self, entry: MemoryEntry) -> None:
+        ctx = require_tenant_context(strict=self.enforce_tenant_context)
+        entry.embedding = self.memory_governor.prune_vector(entry.embedding, ctx.tenant_id)
         self._conn.execute(
             """
             INSERT OR REPLACE INTO task_history (key, namespace, value_json, embedding_json, created_at)
@@ -76,6 +83,7 @@ class DistributedMemory:
             ),
         )
         self._conn.commit()
+        self.memory_governor.compact(ctx.tenant_id)
 
     def semantic_vector_search(self, query_embedding: list[float], *, limit: int = 5, namespace: str | None = None) -> list[dict[str, Any]]:
         rows = self._conn.execute(

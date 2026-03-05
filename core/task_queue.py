@@ -11,6 +11,7 @@ from typing import Any, Protocol
 
 from core.retry_engine import PERMANENT, RetryEngine, get_default_retry_engine
 from monitoring.structured_logging import log_event
+from security.tenant_context import require_tenant_context
 
 
 @dataclass(slots=True)
@@ -136,6 +137,7 @@ class DistributedTaskQueue:
         max_retries: int = 3,
         visibility_timeout_seconds: int = 30,
         retry_engine: RetryEngine | None = None,
+        enforce_tenant_context: bool = False,
     ) -> None:
         if queue_high_watermark <= 0:
             raise ValueError("queue_high_watermark must be positive")
@@ -153,6 +155,7 @@ class DistributedTaskQueue:
         self._inflight: dict[str, tuple[QueueTask, float]] = {}
         self._logger = logging.getLogger(__name__)
         self.retry_engine = retry_engine or get_default_retry_engine()
+        self.enforce_tenant_context = enforce_tenant_context
 
     @property
     def processing_queue_name(self) -> str:
@@ -163,6 +166,7 @@ class DistributedTaskQueue:
         return f"{self.queue_name}:dlq"
 
     def enqueue_task(self, task: QueueTask | dict[str, Any]) -> QueueTask:
+        require_tenant_context(strict=self.enforce_tenant_context)
         if isinstance(task, dict):
             task = QueueTask(
                 task_id=task.get("task_id", f"task-{uuid.uuid4().hex[:12]}"),

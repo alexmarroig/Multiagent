@@ -8,6 +8,7 @@ from typing import Any, Callable, Tuple, Dict
 from governance.approval_queue import ApprovalQueue, get_approval_queue
 from governance.policy_engine import Policy, PolicyEngine
 from monitoring.tracing import get_tracer
+from security.tenant_context import TenantContext, require_tenant_context
 
 from tools.sandbox_runner import (
     DEFAULT_SANDBOX_RUNNER,
@@ -56,6 +57,7 @@ class ExecutionGateway:
         policy: GatewayPolicy | None = None,
         sandbox_runner: SandboxRunner | None = None,
         retry_engine: RetryEngine | None = None,
+        enforce_tenant_context: bool = False,
     ) -> None:
 
         self.approval_queue = approval_queue or get_approval_queue()
@@ -70,6 +72,7 @@ class ExecutionGateway:
         self._tracer = get_tracer()
 
         self._spent_cost: float = 0.0
+        self.enforce_tenant_context = enforce_tenant_context
 
         self._pipeline = RuntimePipeline(
             policy_engine=PolicyEngine(
@@ -96,6 +99,7 @@ class ExecutionGateway:
         estimated_cost: float = 0.0,
         risk_level: str = "low",
         sandbox_policy: SandboxPolicy | None = None,
+        tenant_context: TenantContext | None = None,
     ) -> Any:
         """
         Public entrypoint for executing a tool.
@@ -115,6 +119,7 @@ class ExecutionGateway:
             estimated_cost=estimated_cost,
             risk_level=risk_level,
             sandbox_policy=sandbox_policy,
+            tenant_context=tenant_context,
         )
 
     def execute_agent_action(
@@ -128,10 +133,13 @@ class ExecutionGateway:
         estimated_cost: float = 0.0,
         risk_level: str = "low",
         sandbox_policy: SandboxPolicy | None = None,
+        tenant_context: TenantContext | None = None,
     ) -> Any:
         """
         Execute an agent action through the runtime pipeline.
         """
+
+        ctx = require_tenant_context(tenant_context, strict=self.enforce_tenant_context)
 
         with self._tracer.start_span(
             f"agent_action.{tool_name}",
@@ -140,6 +148,11 @@ class ExecutionGateway:
                 "tool": tool_name,
                 "category": category,
                 "risk_level": risk_level,
+                "tenant_id": ctx.tenant_id,
+                "agent_id": ctx.agent_id,
+                "request_id": ctx.request_id,
+                "trace_id": ctx.trace_id,
+                "task_id": ctx.task_id,
             },
         ):
 

@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from core.model_gateway import ModelGateway, ModelRequest
+from security.tenant_context import TenantContext
+
 
 @dataclass(slots=True)
 class SummarizationConfig:
@@ -13,13 +16,27 @@ class SummarizationConfig:
 
 
 class ResultSummarizer:
-    def __init__(self, config: SummarizationConfig | None = None) -> None:
+    def __init__(self, config: SummarizationConfig | None = None, *, model_gateway: ModelGateway | None = None) -> None:
         self.config = config or SummarizationConfig()
+        self.model_gateway = model_gateway
 
-    def llm_summarize(self, outputs: list[dict[str, Any]]) -> str:
+    def llm_summarize(self, outputs: list[dict[str, Any]], *, context: TenantContext | None = None) -> str:
         slices = [str(item.get("output", ""))[:120] for item in outputs[: self.config.max_items]]
         joined = " | ".join(slices)
-        return joined[: self.config.max_chars]
+        if self.model_gateway is None or context is None:
+            return joined[: self.config.max_chars]
+        response = self.model_gateway.call(
+            ModelRequest(
+                prompt=f"Summarize: {joined}",
+                model="summary-default",
+                max_tokens=256,
+                estimated_tokens=min(512, max(1, len(joined) // 3)),
+                estimated_cost=0.001 * max(1, len(joined) // 100),
+                metadata={"operation": "result_summarization"},
+            ),
+            context=context,
+        )
+        return str(response["output"])[: self.config.max_chars]
 
     def embedding_compress(self, embedding: list[float], target_dimensions: int = 128) -> list[float]:
         if target_dimensions <= 0:
