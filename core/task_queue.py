@@ -141,6 +141,7 @@ class DistributedTaskQueue:
         tenant_queue_limits: dict[str, int] | None = None,
         tenant_priority_boost: dict[str, int] | None = None,
         max_tasks_per_dequeue_cycle: int = 1000,
+        saturation_reject_ratio: float = 1.5,
         retry_engine: RetryEngine | None = None,
         enforce_tenant_context: bool = False,
     ) -> None:
@@ -161,6 +162,7 @@ class DistributedTaskQueue:
         self.tenant_queue_limits = tenant_queue_limits or {}
         self.tenant_priority_boost = tenant_priority_boost or {}
         self.max_tasks_per_dequeue_cycle = max(1, max_tasks_per_dequeue_cycle)
+        self.saturation_reject_ratio = max(1.0, float(saturation_reject_ratio))
         self._inflight: dict[str, tuple[QueueTask, float]] = {}
         self._tenant_queued_counts: dict[str, int] = {}
         self._tenant_dequeue_streak: dict[str, int] = {}
@@ -202,6 +204,10 @@ class DistributedTaskQueue:
             runtime_metrics.inc("queue.inflight_backpressure_rejections")
             raise OverflowError("queue inflight saturation")
 
+        if self.queue_size() >= int(self.queue_high_watermark * self.saturation_reject_ratio):
+            runtime_metrics.inc("queue.saturation_rejections")
+            raise OverflowError("queue hard saturation")
+
         self.backend.push(self.queue_name, task.to_json())
         self._tenant_queued_counts[tenant_id] = self._tenant_queued_counts.get(tenant_id, 0) + 1
         runtime_metrics.inc("queue.enqueued")
@@ -234,6 +240,15 @@ class DistributedTaskQueue:
         runtime_metrics.inc("queue.dequeued")
         runtime_metrics.set_gauge(f"queue.depth.{self.queue_name}", float(self.queue_size()))
         return task
+
+    def dequeue_many(self, *, max_items: int, timeout_seconds: int = 1) -> list[QueueTask]:
+        tasks: list[QueueTask] = []
+        for _ in range(max(1, max_items)):
+            task = self.dequeue_task(timeout_seconds=timeout_seconds)
+            if task is None:
+                break
+            tasks.append(task)
+        return tasks
 
     def acknowledge_task(self, task: QueueTask) -> None:
         self._inflight.pop(task.task_id, None)
