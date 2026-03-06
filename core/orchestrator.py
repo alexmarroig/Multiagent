@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -49,6 +50,7 @@ class Orchestrator:
         max_schedule_tasks: int = 500,
         max_active_runs_per_tenant: int = 128,
         max_spawn_requests_per_run: int = 100,
+        run_timeout_seconds: float = 120.0,
     ) -> None:
         self.task_graph = task_graph
         self.autonomy_engine = autonomy_engine
@@ -64,6 +66,7 @@ class Orchestrator:
         self.max_schedule_tasks = max(1, max_schedule_tasks)
         self.max_active_runs_per_tenant = max(1, max_active_runs_per_tenant)
         self.max_spawn_requests_per_run = max(1, max_spawn_requests_per_run)
+        self.run_timeout_seconds = max(1.0, run_timeout_seconds)
         self._active_runs_by_tenant: dict[str, int] = defaultdict(int)
 
     def run(self, context: OrchestrationContext, objective: dict[str, Any]) -> dict[str, Any]:
@@ -92,16 +95,29 @@ class Orchestrator:
                 self.telemetry.record("orchestration.backpressure_rejected", {"request_id": context.request_id})
                 return {"status": "deferred", "reason": "queue_backpressure"}
 
+            if objective.get("run_through_runtime_pipeline") is False:
+                self.telemetry.record("orchestration.policy_rejected", {"request_id": context.request_id, "reason": "runtime_pipeline_required"})
+                return {"status": "rejected", "reason": "runtime_pipeline_required"}
+
             spawn_requests = int(objective.get("spawn_count", 0) or 0)
             if spawn_requests > self.max_spawn_requests_per_run:
                 self.telemetry.record("orchestration.spawn_capped", {"request_id": context.request_id, "spawn_requested": spawn_requests, "spawn_cap": self.max_spawn_requests_per_run})
                 objective = {**objective, "spawn_count": self.max_spawn_requests_per_run}
 
+            start = time.monotonic()
             schedule = self.scheduler.generate_plan(graph_id, objective)
             if isinstance(schedule, list) and len(schedule) > self.max_schedule_tasks:
                 schedule = schedule[: self.max_schedule_tasks]
                 self.telemetry.record("orchestration.schedule_truncated", {"request_id": context.request_id, "max_schedule_tasks": self.max_schedule_tasks})
+            if (time.monotonic() - start) > self.run_timeout_seconds:
+                self.telemetry.record("orchestration.timed_out", {"request_id": context.request_id, "stage": "planning"})
+                return {"status": "failed", "reason": "planning_timeout", "graph_id": graph_id}
+
             run_report = self.autonomy_engine.execute(graph_id=graph_id, schedule=schedule)
+            if (time.monotonic() - start) > self.run_timeout_seconds:
+                self.telemetry.record("orchestration.timed_out", {"request_id": context.request_id, "stage": "execution"})
+                return {"status": "failed", "reason": "execution_timeout", "graph_id": graph_id}
+
             guarded_report = self.guardrails.enforce(run_report, budget_limit_usd=context.budget_limit_usd)
             placement = self.load_manager.snapshot()
 

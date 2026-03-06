@@ -168,6 +168,7 @@ class ExecutionGateway:
                     category in self.policy.require_approval_categories
                 ),
                 sandbox_policy=sandbox_policy or SandboxPolicy(),
+                tenant_id=ctx.tenant_id,
             )
 
             strategy = "external_api" if category in {"integration", "external_api"} else "task_execution"
