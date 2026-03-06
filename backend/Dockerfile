@@ -5,23 +5,23 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y wget curl gnupg \
 && rm -rf /var/lib/apt/lists/*
 
-# copy repository first so we can support both monorepo and single-service layouts
+# Copy the entire monorepo to /app
 COPY . /app
 
-# resolve dependency file safely (backend/requirements.txt preferred, root fallback)
+# resolve dependency file safely
 RUN set -eux; \
     if [ -f /app/backend/requirements.txt ]; then \
         cp /app/backend/requirements.txt /tmp/requirements.txt; \
-    elif [ -f /app/requirements.txt ]; then \
-        cp /app/requirements.txt /tmp/requirements.txt; \
     else \
-        echo "No requirements.txt found at /app/backend/requirements.txt or /app/requirements.txt"; \
-        exit 1; \
+        cp /app/requirements.txt /tmp/requirements.txt; \
     fi; \
     pip install --no-cache-dir -r /tmp/requirements.txt
 
 RUN playwright install chromium
 
-ENV PYTHONPATH=/app/backend:/app
+# Set PYTHONPATH to include both the root and backend for monorepo support
+ENV PYTHONPATH=/app:/app/backend
+
+WORKDIR /app/backend
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
